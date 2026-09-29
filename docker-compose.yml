@@ -1,0 +1,22 @@
+services:
+  backend:
+    # Built & pushed to GHCR by .github/workflows/docker-build.yml on push to main.
+    # `docker compose pull` fetches this on the server; `build:` is used for local dev.
+    image: ghcr.io/ethanganz/ase-manuscript-project-backend:latest
+    build:
+      context: ./backend
+      dockerfile: docker/Dockerfile
+    ports:
+      - "3011:3000"
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/ethanganz/ase-manuscript-project-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8011:8080"
+    restart: unless-stopped

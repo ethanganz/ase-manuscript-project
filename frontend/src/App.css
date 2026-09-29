@@ -1,0 +1,135 @@
+.container {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 12vh 20px 64px;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.name-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.name-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.name-form input::placeholder {
+  color: var(--muted);
+}
+
+.name-form input:focus {
+  border-color: var(--fg);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+.name-form button {
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--btn-fg);
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-bg);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.name-form button:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.name-form button:active:not(:disabled) {
+  opacity: 0.7;
+}
+
+.name-form button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.name-form button:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
+
+.status {
+  margin: 16px 0 0;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.status.error {
+  background: transparent;
+  border-color: var(--fg);
+  font-weight: 500;
+}
+
+.saved {
+  margin-top: 40px;
+}
+
+.saved h2 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.saved ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.saved li {
+  padding: 11px 14px;
+  font-size: 14px;
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s ease;
+}
+
+.saved li:last-child {
+  border-bottom: none;
+}
+
+.saved li:hover {
+  background: var(--hover);
+}
+
+.empty {
+  margin: 0;
+  padding: 20px;
+  font-size: 14px;
+  color: var(--muted);
+  text-align: center;
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
