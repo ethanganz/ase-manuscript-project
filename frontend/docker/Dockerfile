@@ -20,8 +20,12 @@ COPY . .
 
 RUN npm run build
 
-# Serve the static build with the image's default config (no custom nginx file).
 FROM nginxinc/nginx-unprivileged:1.27-alpine
+
+# Serve the SPA and proxy /api to the FastAPI backend — the "trivia fallback":
+# the frontend forwards API calls itself, so requests reach the backend even if
+# the Cloudflare tunnel's /api path rule doesn't route them there directly.
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
 COPY --from=builder /build/dist /usr/share/nginx/html
 

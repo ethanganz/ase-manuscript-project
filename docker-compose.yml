@@ -19,4 +19,6 @@ services:
       dockerfile: docker/Dockerfile
     ports:
       - "8011:8080"
+    depends_on:
+      - backend
     restart: unless-stopped
