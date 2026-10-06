@@ -1,7 +1,7 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import names
+from routes import documents, names
 
 app = FastAPI(
     title="ASE Manuscript Project"
@@ -17,3 +17,4 @@ app.add_middleware(
 )
 
 app.include_router(names.router)
+app.include_router(documents.router)
