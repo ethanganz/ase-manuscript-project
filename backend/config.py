@@ -9,13 +9,13 @@ BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 
-# --- Upload pipeline -------------------------------------------------------
-# Permanent files are stored in Supabase Storage.
-
 # --- Supabase (server-side only - never expose the API key to the client) ---
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY", "")
 
+# --- Upload pipeline -------------------------------------------------------
+# Permanent files are stored in Supabase Storage.
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "documents")
 
 MB = 1024 * 1024
 

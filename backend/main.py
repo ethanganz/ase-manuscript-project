@@ -1,11 +1,9 @@
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import names
 
-app = FastAPI(
-    title="ASE Manuscript Project"
-)
+from routes import collections, documents, names
+
+app = FastAPI(title="ASE Manuscript Project")
 
 # CORS middleware - change in production
 app.add_middleware(
@@ -16,4 +14,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.get("/api/health", tags=["health"])
+def health():
+    return {"status": "ok"}
+
+
 app.include_router(names.router)
+app.include_router(collections.router)
+app.include_router(documents.router)
