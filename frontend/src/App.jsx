@@ -4,8 +4,7 @@ import { CreateCollectionModal } from './components/CreateCollectionModal.jsx'
 import { Header } from './components/Header.jsx'
 import { Hero } from './components/Hero.jsx'
 import { ResearchSection } from './components/ResearchSection.jsx'
-import { UploadSection } from './components/UploadSection.jsx'
-import { createCollection, getCollections, uploadDocument } from './api/documents.js'
+import { createCollection, getCollections, uploadDocument, uploadFiles } from './api/documents.js'
 import { collections as sampleCollections, places } from './data/collections.js'
 
 function App() {
@@ -56,7 +55,7 @@ function App() {
     }
   }
 
-  async function handleCreateCollection(event) {
+    async function handleCreateCollection(event) {
     event.preventDefault()
 
     const targetCollectionId = selectedCollection || null
@@ -83,11 +82,13 @@ function App() {
           collectionDescription.trim(),
         )
         collectionId = collection.id
+        // Remember it right away, so a retry uploads into it
+        // instead of creating a second collection.
+        setRemoteCollections((previous) => [collection, ...previous])
+        setSelectedCollection(collectionId)
       }
 
-      for (const file of selectedCollectionFiles) {
-        await uploadDocument(collectionId, file)
-      }
+      const report = await uploadFiles(collectionId, selectedCollectionFiles)
 
       const updatedCollections = await getCollections()
       setRemoteCollections(updatedCollections)
@@ -96,7 +97,17 @@ function App() {
       setCollectionDescription('')
       setSelectedCollectionFiles([])
       event.target.reset()
-      setIsModalOpen(false)
+
+      if (report.rejected > 0) {
+        // Some files were saved, some were skipped: keep the window open and say which.
+        const skipped = report.results
+          .filter((r) => r.status === 'rejected')
+          .map((r) => `${r.filename}: ${r.error}`)
+          .join('\n')
+        setCollectionError(`${report.accepted} uploaded. Skipped:\n${skipped}`)
+      } else {
+        setIsModalOpen(false)
+      }
     } catch (error) {
       setCollectionError(error.message)
     } finally {

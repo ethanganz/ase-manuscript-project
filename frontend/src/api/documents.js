@@ -24,21 +24,37 @@ export async function createCollection(name, description) {
   return data
 }
 
-export async function uploadDocument(collectionId, file) {
+export async function uploadFiles(collectionId, files) {
   const formData = new FormData()
-  formData.append('collection_id', collectionId)
-  formData.append('file', file)
+  for (const file of files) {
+    formData.append('files', file) // same field name repeated = many files
+  }
 
-  const response = await fetch('/api/documents/upload', {
+  const response = await fetch(`/api/collections/${collectionId}/uploads`, {
     method: 'POST',
-    body: formData,
+    body: formData, // do not set Content-Type, the browser adds it
   })
 
   const data = await response.json().catch(() => ({}))
 
-  if (!response.ok) {
-    throw new Error(data.detail || `Upload failed (${response.status})`)
-  }
+  // 201 = at least one file was accepted
+  if (response.ok) return data
 
-  return data
+  // 422 with a report = every file was rejected
+  if (Array.isArray(data.results)) {
+    throw new Error(data.results.map((r) => `${r.filename}: ${r.error}`).join('\n'))
+  }
+  if (response.status === 413) {
+    throw new Error('Files are too large to upload')
+  }
+  throw new Error(
+    typeof data.detail === 'string' ? data.detail : `Upload failed (${response.status})`,
+  )
 }
+
+// Kept so any old code that uploads a single file still works.
+export async function uploadDocument(collectionId, file) {
+  const report = await uploadFiles(collectionId, [file])
+  return { id: report.results[0]?.document_id, ...report }
+}
+

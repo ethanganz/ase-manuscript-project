@@ -2,4 +2,7 @@ fastapi>=0.115
 uvicorn[standard]>=0.30
 supabase>=2.6
 python-dotenv>=1.0
+pymupdf>=1.24.3
+pillow>=10.3
+pillow-heif>=0.18
 python-multipart>=0.0.20
