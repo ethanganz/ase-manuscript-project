@@ -23,6 +23,9 @@ from pillow_heif import register_heif_opener
 import config
 from database.repository import Repository
 from services.storage import ObjectStorage
+import logging
+
+logger = logging.getLogger("uvicorn.error")
 
 register_heif_opener()  # lets Pillow open .heic files
 
@@ -158,8 +161,8 @@ def _pdf_pages(src: Path, pages_dir: Path) -> list[_Page]:
 def _ingest_single(repo: Repository, storage: ObjectStorage, collection_id: str,
                    filename: str, src: Path, kind: str,
                    source_archive: Optional[str] = None) -> FileOutcome:
-    document_id = str(uuid4())
-    prefix = f"{collection_id}/{document_id}"
+    document_id = str(uuid4())   
+    prefix = f"collections/{collection_id}/documents/{document_id}"
     uploaded: list[str] = []      # storage keys, so we can undo on failure
     doc_created = False
 
@@ -207,6 +210,7 @@ def _ingest_single(repo: Repository, storage: ObjectStorage, collection_id: str,
             _rollback(repo, storage, uploaded, document_id, doc_created)
             raise
         except Exception as exc:
+            logger.exception("Ingest failed for %s", filename)
             _rollback(repo, storage, uploaded, document_id, doc_created)
             raise IngestError("Unexpected error while processing the file") from exc
 

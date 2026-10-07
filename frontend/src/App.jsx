@@ -1,107 +1,167 @@
-import { useCallback, useEffect, useState } from 'react'
-import './App.css'
-
-const API_BASE = import.meta.env.VITE_API_BASE || '/api'
+import { useEffect, useState } from 'react'
+import { CollectionSection } from './components/CollectionSection.jsx'
+import { CreateCollectionModal } from './components/CreateCollectionModal.jsx'
+import { Header } from './components/Header.jsx'
+import { Hero } from './components/Hero.jsx'
+import { ResearchSection } from './components/ResearchSection.jsx'
+import { createCollection, getCollections, uploadDocument, uploadFiles } from './api/documents.js'
+import { collections as sampleCollections, places } from './data/collections.js'
 
 function App() {
-  const [name, setName] = useState('')
-  const [names, setNames] = useState([])
-  const [status, setStatus] = useState(null)
-  const [submitting, setSubmitting] = useState(false)
-
-  const loadNames = useCallback(
-    () =>
-      fetch(`${API_BASE}/names`)
-        .then((res) => {
-          if (!res.ok) throw new Error(`Request failed (${res.status})`)
-          return res.json()
-        })
-        .then((data) => {
-          setNames(Array.isArray(data) ? data : [])
-        })
-        .catch((err) => {
-          console.error('Failed to load names:', err)
-        }),
-    [],
-  )
+  const [search, setSearch] = useState('')
+  const [remoteCollections, setRemoteCollections] = useState([])
+  const [selectedCollection, setSelectedCollection] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadResult, setUploadResult] = useState(null)
+  const [uploadError, setUploadError] = useState('')
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [collectionName, setCollectionName] = useState('')
+  const [collectionDescription, setCollectionDescription] = useState('')
+  const [selectedCollectionFiles, setSelectedCollectionFiles] = useState([])
+  const [creatingCollection, setCreatingCollection] = useState(false)
+  const [collectionError, setCollectionError] = useState('')
 
   useEffect(() => {
-    loadNames()
-  }, [loadNames])
-
-  async function handleSubmit(event) {
-    event.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) return
-
-    setSubmitting(true)
-    setStatus(null)
-    try {
-      const res = await fetch(`${API_BASE}/names`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmed }),
+    getCollections()
+      .then((collections) => {
+        setRemoteCollections(collections)
+        if (collections[0]) setSelectedCollection(collections[0].id)
       })
+      .catch(() => setRemoteCollections([]))
+  }, [])
 
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        const detail = body?.detail
-        const message =
-          typeof detail === 'string'
-            ? detail
-            : Array.isArray(detail)
-              ? detail.map((item) => item?.msg ?? JSON.stringify(item)).join(', ')
-              : `Request failed (${res.status})`
-        throw new Error(message)
-      }
+  async function handleUpload(event) {
+    event.preventDefault()
 
-      setName('')
-      setStatus({ type: 'success', message: `Saved "${trimmed}"` })
-      await loadNames()
-    } catch (err) {
-      setStatus({ type: 'error', message: err?.message || 'Something went wrong' })
+    if (!selectedCollection || !selectedFile) {
+      setUploadError('Select a collection and choose a file')
+      return
+    }
+
+    setUploading(true)
+    setUploadError('')
+    setUploadResult(null)
+
+    try {
+      const result = await uploadDocument(selectedCollection, selectedFile)
+      setUploadResult(result)
+      setSelectedFile(null)
+      event.target.reset()
+    } catch (error) {
+      setUploadError(error.message)
     } finally {
-      setSubmitting(false)
+      setUploading(false)
     }
   }
 
+    async function handleCreateCollection(event) {
+    event.preventDefault()
+
+    const targetCollectionId = selectedCollection || null
+
+    if (!targetCollectionId && !collectionName.trim()) {
+      setCollectionError('Select an existing collection or create a new one')
+      return
+    }
+
+    if (selectedCollectionFiles.length === 0) {
+      setCollectionError('Select at least one file to upload')
+      return
+    }
+
+    setCreatingCollection(true)
+    setCollectionError('')
+
+    try {
+      let collectionId = targetCollectionId
+
+      if (!collectionId) {
+        const collection = await createCollection(
+          collectionName.trim(),
+          collectionDescription.trim(),
+        )
+        collectionId = collection.id
+        // Remember it right away, so a retry uploads into it
+        // instead of creating a second collection.
+        setRemoteCollections((previous) => [collection, ...previous])
+        setSelectedCollection(collectionId)
+      }
+
+      const report = await uploadFiles(collectionId, selectedCollectionFiles)
+
+      const updatedCollections = await getCollections()
+      setRemoteCollections(updatedCollections)
+      setSelectedCollection(collectionId)
+      setCollectionName('')
+      setCollectionDescription('')
+      setSelectedCollectionFiles([])
+      event.target.reset()
+
+      if (report.rejected > 0) {
+        // Some files were saved, some were skipped: keep the window open and say which.
+        const skipped = report.results
+          .filter((r) => r.status === 'rejected')
+          .map((r) => `${r.filename}: ${r.error}`)
+          .join('\n')
+        setCollectionError(`${report.accepted} uploaded. Skipped:\n${skipped}`)
+      } else {
+        setIsModalOpen(false)
+      }
+    } catch (error) {
+      setCollectionError(error.message)
+    } finally {
+      setCreatingCollection(false)
+    }
+  }
+
+  function openCollectionModal() {
+    setCollectionError('')
+    setSelectedCollectionFiles([])
+    setIsModalOpen(true)
+  }
+
   return (
-    <main className="container">
-      <h1>Submit your name</h1>
-      <p className="subtitle">Your name is saved to the Supabase database.</p>
+    <main className="min-h-screen bg-[#f7f8f5] text-[#1e2a27]">
+      <Header />
 
-      <form className="name-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Your name"
-          aria-label="Your name"
-          maxLength={200}
+      <div id="top" className="mx-auto max-w-[1120px] px-6 py-14 lg:px-8 lg:py-20">
+        <Hero onCreateCollection={openCollectionModal} />
+        <CollectionSection
+          collections={remoteCollections}
+          search={search}
+          onSearchChange={setSearch}
         />
-        <button type="submit" disabled={submitting || name.trim() === ''}>
-          {submitting ? 'Saving…' : 'Submit'}
-        </button>
-      </form>
+        {/* <UploadSection
+          collections={remoteCollections}
+          selectedCollection={selectedCollection}
+          onCollectionChange={setSelectedCollection}
+          selectedFile={selectedFile}
+          onFileChange={setSelectedFile}
+          uploading={uploading}
+          uploadError={uploadError}
+          uploadResult={uploadResult}
+          onSubmit={handleUpload}
+        /> */}
+        <ResearchSection places={places} />
+      </div>
 
-      {status && (
-        <p className={`status ${status.type}`} role="status">
-          {status.message}
-        </p>
-      )}
-
-      <section className="saved">
-        <h2>Saved names</h2>
-        {names.length === 0 ? (
-          <p className="empty">No names yet.</p>
-        ) : (
-          <ul>
-            {names.map((entry, index) => (
-              <li key={index}>{entry.name}</li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <CreateCollectionModal
+        isOpen={isModalOpen}
+        collections={remoteCollections}
+        selectedCollectionId={selectedCollection}
+        onCollectionChange={setSelectedCollection}
+        name={collectionName}
+        description={collectionDescription}
+        selectedFiles={selectedCollectionFiles}
+        submitting={creatingCollection}
+        error={collectionError}
+        onNameChange={setCollectionName}
+        onDescriptionChange={setCollectionDescription}
+        onFileChange={setSelectedCollectionFiles}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={handleCreateCollection}
+      />
     </main>
   )
 }

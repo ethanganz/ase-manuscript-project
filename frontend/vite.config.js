@@ -1,5 +1,6 @@
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
@@ -9,7 +10,8 @@ export default defineConfig({
   base: process.env.VITE_BASE_PATH || '/',
   plugins: [
     react(),
-    babel({ presets: [reactCompilerPreset()] })
+    babel({ presets: [reactCompilerPreset()] }),
+    tailwindcss(),
   ],
   server: {
     // Proxy API calls to the FastAPI backend during development.
