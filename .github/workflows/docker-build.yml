@@ -32,6 +32,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Version tags come from the IMAGE_VERSION files, which are also read by
+      # deploy.sh on the server so the deployed image matches the pinned version.
+      - name: Read backend image version
+        id: backend_version
+        run: echo "version=$(tr -d '[:space:]' < backend/docker/IMAGE_VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Read frontend image version
+        id: frontend_version
+        run: echo "version=$(tr -d '[:space:]' < frontend/docker/IMAGE_VERSION)" >> "$GITHUB_OUTPUT"
+
       # Backend image: FastAPI + uvicorn (host port 3011 in docker-compose.yml).
       - name: Build and push backend image
         uses: docker/build-push-action@v5
@@ -44,6 +54,7 @@ jobs:
           cache-to: type=gha,mode=max
           tags: |
             ghcr.io/${{ github.repository_owner }}/ase-manuscript-project-backend:latest
+            ghcr.io/${{ github.repository_owner }}/ase-manuscript-project-backend:${{ steps.backend_version.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/ase-manuscript-project-backend:${{ github.sha }}
 
       # Frontend image: static SPA served by nginx (host port 8011).
@@ -60,4 +71,5 @@ jobs:
           cache-to: type=gha,mode=max
           tags: |
             ghcr.io/${{ github.repository_owner }}/ase-manuscript-project-frontend:latest
+            ghcr.io/${{ github.repository_owner }}/ase-manuscript-project-frontend:${{ steps.frontend_version.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/ase-manuscript-project-frontend:${{ github.sha }}

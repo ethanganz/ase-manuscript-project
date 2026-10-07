@@ -1,8 +1,11 @@
 services:
   backend:
-    # Built & pushed to GHCR by .github/workflows/docker-build.yml on push to main.
-    # `docker compose pull` fetches this on the server; `build:` is used for local dev.
-    image: ghcr.io/ethanganz/ase-manuscript-project-backend:latest
+    # Built & pushed to GHCR by .github/workflows/docker-build.yml on push to main,
+    # tagged with the version in backend/docker/IMAGE_VERSION as well as :latest.
+    # `deploy.sh` selects the pinned version (falls back to :latest); `build:` is
+    # used for local dev.
+    # `docker compose pull` fetches the selected tag on the server.
+    image: ghcr.io/ethanganz/ase-manuscript-project-backend:${BACKEND_IMAGE_VERSION:-latest}
     build:
       context: ./backend
       dockerfile: docker/Dockerfile
@@ -13,7 +16,8 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/ethanganz/ase-manuscript-project-frontend:latest
+    # Tag comes from frontend/docker/IMAGE_VERSION via deploy.sh (defaults to :latest).
+    image: ghcr.io/ethanganz/ase-manuscript-project-frontend:${FRONTEND_IMAGE_VERSION:-latest}
     build:
       context: ./frontend
       dockerfile: docker/Dockerfile
