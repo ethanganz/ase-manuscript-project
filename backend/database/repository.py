@@ -4,12 +4,13 @@ Routes and services only talk to the ``Repository`` interface.
 Production uses
 ``SupabaseRepository``; 
 tests use ``InMemoryRepository`` .
+The repository is the only place that touches the database.
 """
 
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
-
+from database.paging import fetch_all
 
 class Repository:
     """Common interface for data access."""
@@ -26,6 +27,7 @@ class Repository:
     def create_pages(self, pages: list[dict]) -> None: ...
     def get_page(self, page_id: str) -> Optional[dict]: ...
     def list_pages(self, document_id: str) -> list[dict]: ...
+    def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
 
 class InMemoryRepository(Repository):
@@ -35,6 +37,7 @@ class InMemoryRepository(Repository):
         self.collections: dict[str, dict] = {}
         self.documents: dict[str, dict] = {}
         self.pages: dict[str, dict] = {}
+        self.mention_details: list[dict] = []   # tests put rows here
 
     @staticmethod
     def _now() -> str:
@@ -96,6 +99,9 @@ class InMemoryRepository(Repository):
         """Return pages belonging to a document."""
         rows = [dict(p) for p in self.pages.values() if p["document_id"] == document_id]
         return sorted(rows, key=lambda p: p["page_number"])
+    
+    def list_mention_details(self, collection_id):
+        return [dict(r) for r in self.mention_details if r["collection_id"] == collection_id]
 
 
 class SupabaseRepository(Repository):
@@ -161,4 +167,9 @@ class SupabaseRepository(Repository):
         res = (self._t("pages").select("*").eq("document_id", document_id)
                .order("page_number").execute())
         return res.data or []
-
+    
+    def list_mention_details(self, collection_id):
+        # order() gives a stable order, which paging needs to avoid skipping rows.
+        return fetch_all(lambda: (self._t("mention_details").select("*")
+            .eq("collection_id", collection_id)
+            .order("mention_id")))
