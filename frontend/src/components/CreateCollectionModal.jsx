@@ -1,4 +1,12 @@
 import { X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+
+const uploadStages = [
+  'Preparing files',
+  'Analyzing documents',
+  'Indexing manuscript pages',
+  'Finalizing collection',
+]
 
 export function CreateCollectionModal({
   isOpen,
@@ -16,6 +24,38 @@ export function CreateCollectionModal({
   onClose,
   onSubmit,
 }) {
+  const [stageIndex, setStageIndex] = useState(0)
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    if (!submitting) {
+      setStageIndex(0)
+      setProgress(0)
+      return
+    }
+
+    const stageTimer = setInterval(() => {
+      setStageIndex((current) => (current + 1) % uploadStages.length)
+    }, 900)
+
+    const progressTimer = setInterval(() => {
+      setProgress((current) => {
+        const next = current + 12
+        return next >= 96 ? 96 : next
+      })
+    }, 350)
+
+    return () => {
+      clearInterval(stageTimer)
+      clearInterval(progressTimer)
+    }
+  }, [submitting])
+
+  const activeLabel = useMemo(() => {
+    if (!submitting) return selectedCollectionId ? 'Upload files' : 'Create collection'
+    return uploadStages[stageIndex]
+  }, [selectedCollectionId, stageIndex, submitting])
+
   if (!isOpen) return null
 
   return (
@@ -47,7 +87,8 @@ export function CreateCollectionModal({
             <select
               value={selectedCollectionId}
               onChange={(event) => onCollectionChange(event.target.value)}
-              className="mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b]"
+              disabled={submitting}
+              className="mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]"
             >
               <option value="">Create a new collection</option>
               {collections.map((collection) => (
@@ -66,7 +107,8 @@ export function CreateCollectionModal({
                   type="text"
                   value={name}
                   onChange={(event) => onNameChange(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b]"
+                  disabled={submitting}
+                  className="mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]"
                   placeholder="Letters of Henri Dupont"
                   required
                   maxLength={200}
@@ -78,7 +120,8 @@ export function CreateCollectionModal({
                 <textarea
                   value={description}
                   onChange={(event) => onDescriptionChange(event.target.value)}
-                  className="mt-2 min-h-24 w-full resize-y rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b]"
+                  disabled={submitting}
+                  className="mt-2 min-h-24 w-full resize-y rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]"
                   placeholder="Optional description"
                   maxLength={2000}
                 />
@@ -92,8 +135,9 @@ export function CreateCollectionModal({
               type="file"
               multiple
               accept=".pdf,.jpg,.jpeg,.png,.heic,.zip"
+              disabled={submitting}
               onChange={(event) => onFileChange(Array.from(event.target.files || []))}
-              className="mt-2 block w-full rounded-lg border border-dashed border-[#cbd8cc] bg-[#fbfcfa] px-3 py-2.5 text-sm file:mr-4 file:rounded file:border-0 file:bg-[#1e3b35] file:px-3 file:py-2 file:text-white"
+              className="mt-2 block w-full rounded-lg border border-dashed border-[#cbd8cc] bg-[#fbfcfa] px-3 py-2.5 text-sm file:mr-4 file:rounded file:border-0 file:bg-[#1e3b35] file:px-3 file:py-2 file:text-white disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
 
@@ -108,6 +152,27 @@ export function CreateCollectionModal({
             </div>
           )}
 
+          {submitting && (
+            <div className="rounded-xl border border-[#dfe5df] bg-[#f5faf6] p-3">
+              <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.15em] text-[#60716a]">
+                <span>Processing</span>
+                <span>{progress}%</span>
+              </div>
+
+              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#e4ece6]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#1e3b35] via-[#527667] to-[#b9d2c3] transition-all duration-500 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 text-sm text-[#355248]">
+                <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-[#1e3b35]" />
+                <span>{uploadStages[stageIndex]}</span>
+              </div>
+            </div>
+          )}
+
           {error && (
             <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
@@ -118,16 +183,17 @@ export function CreateCollectionModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-[#cbdace] px-4 py-2.5 text-sm font-medium text-[#476d5b] hover:bg-[#edf1ed]"
+              disabled={submitting}
+              className="rounded-lg border border-[#cbdace] px-4 py-2.5 text-sm font-medium text-[#476d5b] hover:bg-[#edf1ed] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting || (selectedCollectionId === '' && name.trim() === '') || selectedFiles.length === 0}
-              className="rounded-lg bg-[#1e3b35] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-[#1e3b35] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? 'Uploading…' : selectedCollectionId ? 'Upload files' : 'Create collection'}
+              {submitting ? activeLabel : selectedCollectionId ? 'Upload files' : 'Create collection'}
             </button>
           </div>
         </form>

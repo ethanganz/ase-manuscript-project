@@ -1,4 +1,7 @@
 import { ArrowUpRight, MoreHorizontal, Search } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+
+const COLLECTIONS_PER_PAGE = 6
 
 function CollectionCard({ collection }) {
   return (
@@ -32,10 +35,39 @@ function CollectionCard({ collection }) {
   )
 }
 
-export function CollectionSection({ collections, search, onSearchChange }) {
-  const filteredCollections = collections.filter((collection) =>
-    collection.name.toLowerCase().includes(search.toLowerCase())
+function CollectionSkeletonCard() {
+  return (
+    <div className="animate-pulse rounded-xl border border-[#e0e6e0] bg-white p-5">
+      <div className="mb-5 h-32 rounded-lg bg-[#e4ece5]" />
+      <div className="h-5 w-2/3 rounded bg-[#e4ece5]" />
+      <div className="mt-3 h-3 w-full rounded bg-[#edf1ee]" />
+      <div className="mt-2 h-3 w-4/5 rounded bg-[#edf1ee]" />
+      <div className="mt-6 h-px bg-[#edf1ee]" />
+      <div className="mt-4 h-3 w-1/3 rounded bg-[#edf1ee]" />
+    </div>
   )
+}
+
+export function CollectionSection({ collections, search, onSearchChange, isLoading }) {
+  const [page, setPage] = useState(1)
+
+  const filteredCollections = useMemo(
+    () =>
+      collections.filter((collection) =>
+        collection.name.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [collections, search],
+  )
+
+  const totalPages = Math.max(1, Math.ceil(filteredCollections.length / COLLECTIONS_PER_PAGE))
+
+  useEffect(() => {
+    setPage(1)
+  }, [search, filteredCollections.length])
+
+  const currentPage = Math.min(page, totalPages)
+  const startIndex = (currentPage - 1) * COLLECTIONS_PER_PAGE
+  const visibleCollections = filteredCollections.slice(startIndex, startIndex + COLLECTIONS_PER_PAGE)
 
   return (
     <section id="collections" className="py-12">
@@ -59,14 +91,50 @@ export function CollectionSection({ collections, search, onSearchChange }) {
         </label>
       </div>
 
-      <div className="mt-7 grid gap-5 xl:grid-cols-3">
-        {filteredCollections.map((collection) => (
-          <CollectionCard key={collection.id} collection={collection} />
-        ))}
-      </div>
+      {isLoading ? (
+        <div className="mt-7 grid gap-5 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <CollectionSkeletonCard key={`skeleton-${index}`} />
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="mt-7 grid gap-5 xl:grid-cols-3">
+            {visibleCollections.map((collection) => (
+              <CollectionCard key={collection.id} collection={collection} />
+            ))}
+          </div>
 
-      {filteredCollections.length === 0 && (
-        <p className="mt-6 text-sm text-[#7e8b85]">No collections found.</p>
+          {filteredCollections.length === 0 && (
+            <p className="mt-6 text-sm text-[#7e8b85]">No collections found.</p>
+          )}
+
+          {filteredCollections.length > COLLECTIONS_PER_PAGE && (
+            <div className="mt-8 flex items-center justify-between gap-3 rounded-xl border border-[#e0e6e0] bg-white px-4 py-3 text-sm text-[#55615b]">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={currentPage === 1}
+                className="rounded-md border border-[#dfe5df] px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous
+              </button>
+
+              <span>
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-md border border-[#dfe5df] px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       )}
     </section>
   )

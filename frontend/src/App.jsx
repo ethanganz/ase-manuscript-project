@@ -21,14 +21,27 @@ function App() {
   const [selectedCollectionFiles, setSelectedCollectionFiles] = useState([])
   const [creatingCollection, setCreatingCollection] = useState(false)
   const [collectionError, setCollectionError] = useState('')
+  const [loadingCollections, setLoadingCollections] = useState(true)
 
   useEffect(() => {
+    let timer = null
+
     getCollections()
       .then((collections) => {
-        setRemoteCollections(collections)
-        if (collections[0]) setSelectedCollection(collections[0].id)
+        timer = setTimeout(() => {
+          setRemoteCollections(collections)
+          if (collections[0]) setSelectedCollection(collections[0].id)
+          setLoadingCollections(false)
+        }, 400)
       })
-      .catch(() => setRemoteCollections([]))
+      .catch(() => {
+        setRemoteCollections([])
+        setLoadingCollections(false)
+      })
+
+    return () => {
+      if (timer) clearTimeout(timer)
+    }
   }, [])
 
   async function handleUpload(event) {
@@ -131,6 +144,7 @@ function App() {
           collections={remoteCollections}
           search={search}
           onSearchChange={setSearch}
+          isLoading={loadingCollections}
         />
         {/* <UploadSection
           collections={remoteCollections}
