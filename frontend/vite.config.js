@@ -3,9 +3,6 @@ import babel from '@rolldown/plugin-babel'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
 
-// https://vite.dev/config/
-const apiTarget = process.env.VITE_API_TARGET || 'http://localhost:8011'
-
 export default defineConfig({
   // Staging serves the built app under a sub-path (VITE_BASE_PATH, e.g.
   // /apps/staging/). Defaults to / for local development.
@@ -21,7 +18,7 @@ export default defineConfig({
     //   VITE_API_TARGET=http://localhost:8011
     proxy: {
       '/api': {
-        target: apiTarget,
+        target: 'http://localhost:3000',
         changeOrigin: true,
       },
     },
