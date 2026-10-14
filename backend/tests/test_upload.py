@@ -24,6 +24,49 @@ def test_upload_png(client, collection):
     assert img.status_code == 200 and img.content.startswith(b"\x89PNG")
 
 
+def test_page_transcription_is_returned_when_present(client, collection, repo):
+    upload(client, collection["id"], ("letter.png", make_image()))
+    doc = client.get(f"/api/collections/{collection['id']}/documents").json()[0]
+    page = client.get(f"/api/documents/{doc['id']}/pages").json()[0]
+    assert page["transcription_text"] is None
+
+    repo.pages[page["id"]]["transcription_text"] = "Dear friend,\nI write to you."
+    page = client.get(f"/api/documents/{doc['id']}/pages").json()[0]
+    assert page["transcription_text"] == "Dear friend,\nI write to you."
+
+
+def test_original_pdf_can_be_previewed_before_pages_are_ready(client, collection, repo):
+    upload(client, collection["id"], ("letter.pdf", make_pdf()))
+    doc = client.get(f"/api/collections/{collection['id']}/documents").json()[0]
+    repo.pages.clear()
+
+    preview = client.get(f"/api/documents/{doc['id']}/preview")
+    assert preview.status_code == 200
+    assert preview.headers["content-type"] == "application/pdf"
+    assert preview.headers["content-disposition"] == "inline"
+    assert preview.content.startswith(b"%PDF-")
+
+
+def test_heic_original_has_browser_friendly_preview(client, collection):
+    upload(client, collection["id"], ("letter.heic", make_heic()))
+    doc = client.get(f"/api/collections/{collection['id']}/documents").json()[0]
+
+    preview = client.get(f"/api/documents/{doc['id']}/preview")
+    assert preview.status_code == 200
+    assert preview.headers["content-type"] == "image/jpeg"
+    assert preview.content.startswith(b"\xff\xd8\xff")
+
+
+def test_missing_original_has_clear_preview_error(client, collection, repo, storage):
+    upload(client, collection["id"], ("letter.png", make_image()))
+    doc = client.get(f"/api/collections/{collection['id']}/documents").json()[0]
+    storage.objects.pop(repo.get_document(doc["id"])["original_path"])
+
+    preview = client.get(f"/api/documents/{doc['id']}/preview")
+    assert preview.status_code == 404
+    assert preview.json()["detail"] == "Original file not found"
+
+
 def test_upload_jpeg(client, collection):
     r = upload(client, collection["id"], ("scan.jpeg", make_image("JPEG")))
     assert r.status_code == 201

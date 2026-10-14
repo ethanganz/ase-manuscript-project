@@ -8,6 +8,38 @@ export async function getCollections() {
   return response.json()
 }
 
+export async function getCollectionDocuments(collectionId) {
+  const response = await fetch(`/api/collections/${collectionId}/documents`)
+
+  if (!response.ok) {
+    throw new Error('Unable to load manuscripts')
+  }
+
+  return response.json()
+}
+
+export async function getDocumentPages(documentId) {
+  const response = await fetch(`/api/documents/${documentId}/pages`)
+
+  if (!response.ok) {
+    throw new Error('Unable to load manuscript pages')
+  }
+
+  return response.json()
+}
+
+export async function getDocumentPreview(documentId, signal) {
+  const response = await fetch(`/api/documents/${documentId}/preview`, { signal })
+
+  if (!response.ok) {
+    throw new Error(response.status === 404
+      ? 'The original file is not available in storage.'
+      : 'Unable to load the original file')
+  }
+
+  return response.blob()
+}
+
 export async function createCollection(name, description) {
   const response = await fetch('/api/collections', {
     method: 'POST',

@@ -1,4 +1,4 @@
-import { ArrowUpRight, Check, Sparkles } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 
 export function ResearchSection({ places }) {
   return (

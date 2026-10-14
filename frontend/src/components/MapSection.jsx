@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { getCountryMentions, getCountrySummaries } from '../api/map.js'
 import { useFetch } from '../lib/useFetch.js'
 import { CountryMap } from './CountryMap.jsx'
@@ -21,13 +21,15 @@ export function MapSection({ collections }) {
   const collectionId = pickedCollectionId || collections[0]?.id || ''
 
   // 1) Coloured countries of this collection.
-  const summariesQuery = useFetch(collectionId, () => getCountrySummaries(collectionId))
+  const loadSummaries = useCallback(() => getCountrySummaries(collectionId), [collectionId])
+  const summariesQuery = useFetch(collectionId, loadSummaries)
   const summaries = summariesQuery.data ?? NO_SUMMARIES
 
   // 2) Mentions of the clicked country. Empty key = nothing clicked yet.
+  const loadMentions = useCallback(() => getCountryMentions(collectionId, selectedCode), [collectionId, selectedCode])
   const mentionsQuery = useFetch(
     collectionId && selectedCode ? `${collectionId}/${selectedCode}` : '',
-    () => getCountryMentions(collectionId, selectedCode),
+    loadMentions,
   )
   const mentions = mentionsQuery.data ?? NO_MENTIONS
 

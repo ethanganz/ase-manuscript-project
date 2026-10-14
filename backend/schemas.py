@@ -45,6 +45,7 @@ class PageOut(BaseModel):
     width: int
     height: int
     status: str
+    transcription_text: Optional[str] = None
 
 
 # Result for a single uploaded file.

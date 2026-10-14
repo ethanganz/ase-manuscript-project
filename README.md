@@ -1,6 +1,12 @@
 # ase-manuscript-project
 A web-based application for recognizing, analysing and understanding historical manuscripts.
 
+## Database setup
+
+Apply the SQL files in `backend/database/migrations` in number order in the Supabase SQL editor. Migration `003_page_transcriptions.sql` adds optional text to each manuscript page; the reader displays that text beside the page image when it is available.
+
+Uploaded originals and page images use a private Supabase Storage bucket named `documents` (or the name set by `SUPABASE_BUCKET`). The backend needs a server-side secret/service-role key in `SUPABASE_API_KEY` to read that bucket. A publishable key can list the database records but cannot supply private file previews.
+
 ## Deploying to the server
 
 CI (`.github/workflows/docker-build.yml`) builds the images on push to `main`

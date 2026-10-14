@@ -3,21 +3,16 @@ import { CollectionSection } from './components/CollectionSection.jsx'
 import { CreateCollectionModal } from './components/CreateCollectionModal.jsx'
 import { Header } from './components/Header.jsx'
 import { Hero } from './components/Hero.jsx'
-// we safely delete these two lines 
-// import { ResearchSection } from './components/ResearchSection.jsx'
-// import { collections as sampleCollections, places } from './data/collections.js'
-import { createCollection, getCollections, uploadDocument, uploadFiles } from './api/documents.js'
-
+import { createCollection, getCollections, uploadFiles } from './api/documents.js'
 import { MapSection } from './components/MapSection.jsx'
 
 function App() {
   const [search, setSearch] = useState('')
   const [remoteCollections, setRemoteCollections] = useState([])
+  const [collectionsLoading, setCollectionsLoading] = useState(true)
+  const [collectionsError, setCollectionsError] = useState('')
   const [selectedCollection, setSelectedCollection] = useState('')
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadResult, setUploadResult] = useState(null)
-  const [uploadError, setUploadError] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [collectionName, setCollectionName] = useState('')
   const [collectionDescription, setCollectionDescription] = useState('')
@@ -31,34 +26,11 @@ function App() {
         setRemoteCollections(collections)
         if (collections[0]) setSelectedCollection(collections[0].id)
       })
-      .catch(() => setRemoteCollections([]))
+      .catch(() => setCollectionsError('Unable to load collections'))
+      .finally(() => setCollectionsLoading(false))
   }, [])
 
-  async function handleUpload(event) {
-    event.preventDefault()
-
-    if (!selectedCollection || !selectedFile) {
-      setUploadError('Select a collection and choose a file')
-      return
-    }
-
-    setUploading(true)
-    setUploadError('')
-    setUploadResult(null)
-
-    try {
-      const result = await uploadDocument(selectedCollection, selectedFile)
-      setUploadResult(result)
-      setSelectedFile(null)
-      event.target.reset()
-    } catch (error) {
-      setUploadError(error.message)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-    async function handleCreateCollection(event) {
+  async function handleCreateCollection(event) {
     event.preventDefault()
 
     const targetCollectionId = selectedCollection || null
@@ -95,6 +67,7 @@ function App() {
 
       const updatedCollections = await getCollections()
       setRemoteCollections(updatedCollections)
+      setRefreshKey((key) => key + 1)
       setSelectedCollection(collectionId)
       setCollectionName('')
       setCollectionDescription('')
@@ -132,21 +105,12 @@ function App() {
         <Hero onCreateCollection={openCollectionModal} />
         <CollectionSection
           collections={remoteCollections}
+          loading={collectionsLoading}
+          error={collectionsError}
           search={search}
           onSearchChange={setSearch}
+          refreshKey={refreshKey}
         />
-        {/* <UploadSection
-          collections={remoteCollections}
-          selectedCollection={selectedCollection}
-          onCollectionChange={setSelectedCollection}
-          selectedFile={selectedFile}
-          onFileChange={setSelectedFile}
-          uploading={uploading}
-          uploadError={uploadError}
-          uploadResult={uploadResult}
-          onSubmit={handleUpload}
-        /> */}
-        {/* <ResearchSection places={places} /> */}
         <MapSection collections={remoteCollections} />
       </div>
 
