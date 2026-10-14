@@ -1,7 +1,7 @@
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useMemo, useState } from 'react'
 import { GeoJSON, MapContainer, TileLayer } from 'react-leaflet'
-import { countryDisplayName, countryStyle, getCountryCode, indexByCode } from '../lib/countries.js'
+import { countryDisplayName, countryStyle, getCountryCode, indexByCode } from '../libraray/countries.js'
 // The map itself
 // import.meta.env.BASE_URL keeps this working when the app is served under a
 // sub-path (VITE_BASE_PATH, e.g. /apps/staging/).

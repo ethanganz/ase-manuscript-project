@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { getCountryMentions, getCountrySummaries } from '../api/map.js'
-import { useFetch } from '../lib/useFetch.js'
+import { useFetch } from '../libraray/useFetch.js'
 import { CountryMap } from './CountryMap.jsx'
 import { CountryMentionsPanel } from './CountryMentionsPanel.jsx'
 import { PageViewerModal } from './PageViewerModal.jsx'
