@@ -62,3 +62,18 @@ class UploadReport(BaseModel):
     accepted: int
     rejected: int
     results: list[FileResult]
+
+class CountrySummary(BaseModel):
+    country_code: str        # ISO 3166-1 alpha-2, e.g. "CH"
+    mention_count: int
+    place_count: int
+
+
+class MentionOut(BaseModel):
+    mention_id: UUID
+    place_name: str
+    snippet: Optional[str] = None
+    page_id: UUID            # the page image to open
+    page_number: int
+    document_id: UUID
+    document_name: str

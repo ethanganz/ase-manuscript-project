@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import documents, names
+from routes import map as map_routes
 
 from routes import collections, documents, names
 
@@ -24,3 +25,4 @@ def health():
 app.include_router(names.router)
 app.include_router(collections.router)
 app.include_router(documents.router)
+app.include_router(map_routes.router)

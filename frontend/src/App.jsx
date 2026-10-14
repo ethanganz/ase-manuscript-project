@@ -3,9 +3,12 @@ import { CollectionSection } from './components/CollectionSection.jsx'
 import { CreateCollectionModal } from './components/CreateCollectionModal.jsx'
 import { Header } from './components/Header.jsx'
 import { Hero } from './components/Hero.jsx'
-import { ResearchSection } from './components/ResearchSection.jsx'
+// we safely delete these two lines 
+// import { ResearchSection } from './components/ResearchSection.jsx'
+// import { collections as sampleCollections, places } from './data/collections.js'
 import { createCollection, getCollections, uploadDocument, uploadFiles } from './api/documents.js'
-import { collections as sampleCollections, places } from './data/collections.js'
+
+import { MapSection } from './components/MapSection.jsx'
 
 function App() {
   const [search, setSearch] = useState('')
@@ -157,7 +160,8 @@ function App() {
           uploadResult={uploadResult}
           onSubmit={handleUpload}
         /> */}
-        <ResearchSection places={places} />
+        {/* <ResearchSection places={places} /> */}
+        <MapSection collections={remoteCollections} />
       </div>
 
       <CreateCollectionModal
