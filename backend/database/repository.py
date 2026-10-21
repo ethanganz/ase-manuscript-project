@@ -16,7 +16,7 @@ class Repository:
     """Common interface for data access."""
 
     def create_user(self, email: str, password_hash: str,
-                    display_name: Optional[str]) -> dict: ...
+                    first_name: Optional[str], last_name: Optional[str]) -> dict: ...
     def get_user(self, user_id: str) -> Optional[dict]: ...
     def get_user_by_email(self, email: str) -> Optional[dict]: ...
 
@@ -51,10 +51,10 @@ class InMemoryRepository(Repository):
         """Return the current UTC timestamp."""
         return datetime.now(timezone.utc).isoformat()
 
-    def create_user(self, email, password_hash, display_name):
+    def create_user(self, email, password_hash, first_name, last_name):
         """Create and store a user."""
         row = {"id": str(uuid4()), "email": email, "password_hash": password_hash,
-               "display_name": display_name, "created_at": self._now()}
+               "first_name": first_name, "last_name": last_name, "created_at": self._now()}
         self.users[row["id"]] = row
         return dict(row)
 
@@ -141,11 +141,11 @@ class SupabaseRepository(Repository):
         """Return a Supabase table client."""
         return self._sb().table(name)
 
-    def create_user(self, email, password_hash, display_name):
+    def create_user(self, email, password_hash, first_name, last_name):
         """Create a user in Supabase."""
         res = self._t("users").insert(
             {"email": email, "password_hash": password_hash,
-             "display_name": display_name}).execute()
+             "first_name": first_name, "last_name": last_name}).execute()
         return res.data[0]
 
     def get_user(self, user_id):

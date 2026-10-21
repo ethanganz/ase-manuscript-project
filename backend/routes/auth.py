@@ -27,8 +27,9 @@ def register(payload: UserCreate, response: Response, repo: Repository = Depends
     """Create an account and log in."""
     if repo.get_user_by_email(payload.email) is not None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
-    display_name = f"{payload.first_name} {payload.last_name}"
-    user = repo.create_user(payload.email, hash_password(payload.password), display_name)
+    first_name = payload.first_name
+    last_name = payload.last_name
+    user = repo.create_user(payload.email, hash_password(payload.password), first_name, last_name)
     _start_session(response, user)
     return user
 

@@ -56,7 +56,8 @@ class UserLogin(BaseModel):
 class UserOut(BaseModel):
     id: UUID
     email: str
-    display_name: Optional[str] = None   # "First Last"
+    first_name: Optional[str] = None   # "First Last"
+    last_name: Optional[str] = None   # "First Last"
     created_at: Optional[datetime] = None
 
 
