@@ -11,9 +11,19 @@ import { SESSION_ENDED_EVENT, getCurrentUser, logout } from './api/auth.js'
 import { AuthModal } from './components/AuthModal.jsx'
 
 import { MapSection } from './components/MapSection.jsx'
+import { ProfilePage } from './components/ProfilePage.jsx'
+import { CollectionViewer } from './components/CollectionViewer.jsx'
+
+const PROFILE_HASH = '#profile'
+const COLLECTION_HASH_PREFIX = '#collection/'
 
 function App() {
   const [user, setUser] = useState(null)
+  const [hash, setHash] = useState(window.location.hash)
+  const isProfileOpen = hash === PROFILE_HASH
+  const openCollectionId = hash.startsWith(COLLECTION_HASH_PREFIX)
+    ? hash.slice(COLLECTION_HASH_PREFIX.length)
+    : ''
   const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [remoteCollections, setRemoteCollections] = useState([])
@@ -39,6 +49,26 @@ function App() {
     const onSessionEnded = () => setUser(null)
     window.addEventListener(SESSION_ENDED_EVENT, onSessionEnded)
     return () => window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded)
+  }, [])
+
+  // The profile page lives at #profile and a collection at #collection/<id>;
+  // any other hash shows the archive.
+  useEffect(() => {
+    const onHashChange = () => {
+      const { hash: newHash } = window.location
+      setHash(newHash)
+      if (newHash === PROFILE_HASH || newHash.startsWith(COLLECTION_HASH_PREFIX)) {
+        window.scrollTo(0, 0)
+      } else {
+        // The section only exists after the archive renders again.
+        requestAnimationFrame(() => {
+          const target = window.location.hash && document.querySelector(window.location.hash)
+          target?.scrollIntoView()
+        })
+      }
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
   async function handleLogout() {
@@ -179,27 +209,54 @@ function App() {
     <main className="min-h-screen bg-[#f7f8f5] text-[#1e2a27]">
       <Header user={user} onLogin={() => setIsAuthOpen(true)} onLogout={handleLogout} />
 
-      <div id="top" className="mx-auto max-w-[1120px] px-6 py-14 lg:px-8 lg:py-20">
-        <Hero onCreateCollection={openCollectionModal} />
-        <CollectionSection
-          collections={remoteCollections}
-          search={search}
-          onSearchChange={setSearch}
-          isLoading={loadingCollections}
-        />
-        {/* <UploadSection
-          collections={remoteCollections}
-          selectedCollection={selectedCollection}
-          onCollectionChange={setSelectedCollection}
-          selectedFile={selectedFile}
-          onFileChange={setSelectedFile}
-          uploading={uploading}
-          uploadError={uploadError}
-          uploadResult={uploadResult}
-          onSubmit={handleUpload}
-        /> */}
-        {/* <ResearchSection places={places} /> */}
-        <MapSection collections={remoteCollections} />
+      {/* The collection viewer is a full-height workspace: wider, with less padding. */}
+      <div
+        id="top"
+        className={
+          openCollectionId
+            ? 'mx-auto max-w-[1600px] px-4 py-4 lg:px-6'
+            : 'mx-auto max-w-[1120px] px-6 py-14 lg:px-8 lg:py-20'
+        }
+      >
+        {openCollectionId ? (
+          <CollectionViewer
+            key={openCollectionId}
+            collectionId={openCollectionId}
+            collections={remoteCollections}
+            isLoadingCollections={loadingCollections}
+          />
+        ) : isProfileOpen ? (
+          <ProfilePage
+            user={user}
+            collections={remoteCollections}
+            isLoading={loadingCollections}
+            onLogin={() => setIsAuthOpen(true)}
+            onCreateCollection={openCollectionModal}
+          />
+        ) : (
+          <>
+            <Hero onCreateCollection={openCollectionModal} />
+            <CollectionSection
+              collections={remoteCollections}
+              search={search}
+              onSearchChange={setSearch}
+              isLoading={loadingCollections}
+            />
+            {/* <UploadSection
+              collections={remoteCollections}
+              selectedCollection={selectedCollection}
+              onCollectionChange={setSelectedCollection}
+              selectedFile={selectedFile}
+              onFileChange={setSelectedFile}
+              uploading={uploading}
+              uploadError={uploadError}
+              uploadResult={uploadResult}
+              onSubmit={handleUpload}
+            /> */}
+            {/* <ResearchSection places={places} /> */}
+            <MapSection collections={remoteCollections} />
+          </>
+        )}
       </div>
 
       <CreateCollectionModal

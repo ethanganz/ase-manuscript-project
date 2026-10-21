@@ -10,6 +10,26 @@ export async function getCollections() {
   return response.json()
 }
 
+export async function getDocuments(collectionId) {
+  const response = await apiFetch(`/api/collections/${collectionId}/documents`)
+
+  if (!response.ok) {
+    throw new Error('Unable to load documents')
+  }
+
+  return response.json()
+}
+
+export async function getPages(documentId) {
+  const response = await apiFetch(`/api/documents/${documentId}/pages`)
+
+  if (!response.ok) {
+    throw new Error('Unable to load pages')
+  }
+
+  return response.json()
+}
+
 export async function createCollection(name, description) {
   const response = await apiFetch('/api/collections', {
     method: 'POST',

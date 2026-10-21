@@ -1,28 +1,28 @@
 import { ArrowUpRight, MoreHorizontal, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { CollectionPreview } from '../tools/helpers.jsx'
 
 const COLLECTIONS_PER_PAGE = 6
 
 function CollectionCard({ collection }) {
   return (
-    <article className="group rounded-xl border border-[#e0e6e0] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#c3d2c7] hover:shadow-[0_12px_30px_rgba(35,55,45,0.07)]">
-      <div className="mb-5 flex h-32 items-end rounded-lg bg-[#d9e4dc] p-4">
-        <div className="w-full rounded-md border border-black/5 bg-[#fbfaf5]/70 p-3 backdrop-blur-sm">
-          <div className="h-1 w-1/2 rounded bg-[#53645b]/35" />
-          <div className="mt-2 h-1 w-4/5 rounded bg-[#53645b]/20" />
-          <div className="mt-2 h-1 w-2/3 rounded bg-[#53645b]/20" />
-        </div>
-      </div>
+    <article className="group relative rounded-xl border border-[#e0e6e0] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#c3d2c7] hover:shadow-[0_12px_30px_rgba(35,55,45,0.07)]">
+      <CollectionPreview collectionId={collection.id} className="mb-5 h-32 w-full rounded-lg" />
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-serif text-[19px] leading-tight">{collection.name}</h3>
+          <h3 className="font-serif text-[19px] leading-tight">
+            {/* The ::after makes the whole card clickable. */}
+            <a href={`#collection/${collection.id}`} className="after:absolute after:inset-0 after:rounded-xl">
+              {collection.name}
+            </a>
+          </h3>
           <p className="mt-1 text-xs text-[#8a9790]">
             {collection.description || 'No description'}
           </p>
         </div>
 
-        <button className="text-[#99a39e] opacity-0 transition group-hover:opacity-100" aria-label={`More options for ${collection.name}`}>
+        <button className="relative z-10 text-[#99a39e] opacity-0 transition group-hover:opacity-100" aria-label={`More options for ${collection.name}`}>
           <MoreHorizontal />
         </button>
       </div>
