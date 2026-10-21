@@ -64,7 +64,7 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
           {isRegister && (
             <div className="grid grid-cols-2 gap-3">
               <label className="block text-sm font-medium text-[#374b45]">
-                First name and Last name
+                First name
                 <input
                   type="text"
                   value={firstName}
@@ -72,6 +72,20 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
                   disabled={submitting}
                   className={inputClass}
                   autoComplete="given-name"
+                  maxLength={100}
+                  required
+                />
+              </label>
+              
+              <label className="block text-sm font-medium text-[#374b45]">
+                Last name
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(event) => setLastName(event.target.value)}
+                  disabled={submitting}
+                  className={inputClass}
+                  autoComplete="family-name"
                   maxLength={100}
                   required
                 />

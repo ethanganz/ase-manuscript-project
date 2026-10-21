@@ -13,7 +13,7 @@ export function Header({ user, onLogin, onLogout }) {
         </nav>
 
         <div className="flex items-center gap-3">
-          {user && <span className="hidden text-sm text-[#6e7975] sm:inline">{user.display_name || user.email}</span>}
+          {user && <span className="hidden text-sm text-[#6e7975] sm:inline">{user.first_name} {user.last_name}</span>}
           <button
             type="button"
             onClick={user ? onLogout : onLogin}

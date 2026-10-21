@@ -7,7 +7,8 @@ def test_register_logs_in(anon_client):
     assert r.status_code == 201
     body = r.json()
     assert body["email"] == "ada@example.com"
-    assert body["display_name"] == "Ada Lovelace"
+    assert body["first_name"] == "Ada"
+    assert body["last_name"] == "Lovelace"
     assert "password_hash" not in body
 
     me = anon_client.get("/api/auth/me")
