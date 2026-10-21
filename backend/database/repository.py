@@ -24,6 +24,7 @@ class Repository:
                           owner_id: str, is_public: bool = True) -> dict: ...
     def list_collections(self) -> list[dict]: ...
     def get_collection(self, collection_id: str) -> Optional[dict]: ...
+    def update_collection(self, collection_id: str, fields: dict) -> Optional[dict]: ...
 
     def create_document(self, doc: dict) -> dict: ...
     def delete_document(self, document_id: str) -> None: ...
@@ -84,6 +85,14 @@ class InMemoryRepository(Repository):
         """Return a collection by ID."""
         row = self.collections.get(collection_id)
         return dict(row) if row else None
+
+    def update_collection(self, collection_id, fields):
+        """Change some fields of a collection. Returns the new row, or None if missing."""
+        row = self.collections.get(collection_id)
+        if row is None:
+            return None
+        row.update(fields)
+        return dict(row)
 
     def create_document(self, doc):
         """Create and store a document."""
@@ -173,6 +182,11 @@ class SupabaseRepository(Repository):
     def get_collection(self, collection_id):
         """Return a collection by ID."""
         res = self._t("collections").select("*").eq("id", collection_id).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def update_collection(self, collection_id, fields):
+        """Change some fields of a collection. Returns the new row, or None if missing."""
+        res = self._t("collections").update(fields).eq("id", collection_id).execute()
         return res.data[0] if res.data else None
 
     def create_document(self, doc):

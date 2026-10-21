@@ -46,6 +46,25 @@ export async function createCollection(name, description, isPublic = true) {
   return data
 }
 
+/** Change a collection's name and/or description. Only the owner may do this. */
+export async function updateCollection(collectionId, changes) {
+  const response = await apiFetch(`/api/collections/${collectionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(changes),
+  })
+
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    // 422 from FastAPI is a list of field errors; show the first one.
+    const detail = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail
+    throw new Error(detail || `Could not save changes (${response.status})`)
+  }
+
+  return data
+}
+
 export async function uploadFiles(collectionId, files) {
   const formData = new FormData()
   for (const file of files) {

@@ -8,8 +8,8 @@ from database.repository import Repository
 from services.storage import ObjectStorage
 from deps import (can_view, get_current_user, get_optional_user, get_repo,
                   get_storage, require_visible_collection)
-from schemas import (CollectionCreate, CollectionOut, DocumentOut, FileResult,
-                     UploadReport)
+from schemas import (CollectionCreate, CollectionOut, CollectionUpdate, DocumentOut,
+                     FileResult, UploadReport)
 from services.ingest import ingest_upload
 
 router = APIRouter(prefix="/api/collections", tags=["collections"])
@@ -35,6 +35,30 @@ def list_collections(repo: Repository = Depends(get_repo),
 def get_collection(collection_id: UUID, repo: Repository = Depends(get_repo),
                    user: Optional[dict] = Depends(get_optional_user)):
     return require_visible_collection(repo, str(collection_id), user)
+
+
+@router.patch("/{collection_id}", response_model=CollectionOut)
+def update_collection(collection_id: UUID, payload: CollectionUpdate,
+                      repo: Repository = Depends(get_repo),
+                      user: dict = Depends(get_current_user)):
+    """Rename a collection or change its description. Only the owner may do this."""
+    collection = require_visible_collection(repo, str(collection_id), user)
+    if collection.get("owner_id") != user["id"]:
+        raise HTTPException(status_code=403,
+                            detail="You can only edit your own collections")
+
+    fields = {}
+    if "name" in payload.model_fields_set:
+        name = (payload.name or "").strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="Name cannot be empty")
+        fields["name"] = name
+    if "description" in payload.model_fields_set:
+        fields["description"] = (payload.description or "").strip() or None
+
+    if not fields:
+        return collection
+    return repo.update_collection(str(collection_id), fields)
 
 
 @router.get("/{collection_id}/documents", response_model=list[DocumentOut])

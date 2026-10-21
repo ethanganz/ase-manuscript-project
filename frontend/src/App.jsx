@@ -236,6 +236,11 @@ function App() {
             isLoading={loadingCollections}
             onLogin={() => setIsAuthOpen(true)}
             onCreateCollection={openCollectionModal}
+            onCollectionUpdated={(updated) =>
+              setRemoteCollections((previous) =>
+                previous.map((collection) => (collection.id === updated.id ? updated : collection)),
+              )
+            }
           />
         ) : (
           <>

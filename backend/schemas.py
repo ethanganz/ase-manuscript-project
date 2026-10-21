@@ -68,6 +68,12 @@ class CollectionCreate(BaseModel):
     is_public: bool = True   # False = only the owner can see it
 
 
+# Request model for editing a collection. Only the fields sent are changed.
+class CollectionUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=2000)   # null or "" clears it
+
+
 # Response model for returning collection data.
 class CollectionOut(BaseModel):
     id: UUID

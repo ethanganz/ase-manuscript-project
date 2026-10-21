@@ -1,28 +1,117 @@
-import { ArrowLeft, CalendarDays, FileText, FolderOpen, HardDrive, Lock, Mail, Plus } from 'lucide-react'
+import { ArrowLeft, CalendarDays, FileText, FolderOpen, HardDrive, Lock, Mail, Pencil, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { getDocuments } from '../api/documents.js'
+import { getDocuments, updateCollection } from '../api/documents.js'
 import { CollectionPreview, formatBytes, formatDate, StatCard } from '../tools/helpers.jsx'
 
-// Columns of the "My collections" table. Below `sm` only preview, name and size are shown.
+// Columns of the "My collections" table. Below `sm` only preview, name, size and edit are shown.
 const TABLE_COLUMNS =
-  'grid grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-4 sm:grid-cols-[64px_minmax(0,1fr)_96px_96px_132px]'
+  'grid grid-cols-[64px_minmax(0,1fr)_auto_32px] items-center gap-4 sm:grid-cols-[64px_minmax(0,1fr)_96px_96px_132px_32px]'
 
-function OwnCollectionRow({ collection, documents }) {
+const INPUT =
+  'w-full rounded-md border border-[#dfe5df] bg-white px-2.5 py-1.5 outline-none focus:border-[#6f8e7b] disabled:bg-[#f4f6f4]'
+
+/** Inline form that replaces the name and description while editing. */
+function EditCollectionForm({ collection, onSaved, onCancel }) {
+  const [name, setName] = useState(collection.name)
+  const [description, setDescription] = useState(collection.description || '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    if (!name.trim()) {
+      setError('Name cannot be empty')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      onSaved(await updateCollection(collection.id, { name: name.trim(), description: description.trim() }))
+    } catch (err) {
+      setError(err.message)
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      onKeyDown={(event) => event.key === 'Escape' && !saving && onCancel()}
+      className="space-y-2"
+    >
+      <input
+        type="text"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        disabled={saving}
+        maxLength={200}
+        required
+        autoFocus
+        aria-label="Collection name"
+        className={`${INPUT} font-serif text-[17px]`}
+      />
+      <textarea
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+        disabled={saving}
+        maxLength={2000}
+        rows={2}
+        placeholder="Description (optional)"
+        aria-label="Description"
+        className={`${INPUT} resize-y text-xs`}
+      />
+      {error && <p className="text-xs text-red-700">{error}</p>}
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-md bg-[#1e3b35] px-3 py-1.5 text-xs font-medium text-white transition hover:bg-[#294c43] disabled:opacity-60"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="rounded-md border border-[#cbdace] px-3 py-1.5 text-xs font-medium text-[#476d5b] hover:bg-[#edf1ed] disabled:opacity-50"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function OwnCollectionRow({ collection, documents, onCollectionUpdated }) {
+  const [isEditing, setIsEditing] = useState(false)
   const documentCount = documents?.length
   const totalSize = documents?.reduce((sum, doc) => sum + doc.size_bytes, 0)
   const fileTypes = [...new Set((documents || []).map((doc) => doc.file_type.toUpperCase()))]
 
   return (
-    <li className={`${TABLE_COLUMNS} px-4 py-3 transition-colors hover:bg-[#f7f9f6]`}>
+    <li className={`${TABLE_COLUMNS} px-4 py-3 transition-colors ${isEditing ? 'bg-[#f7f9f6]' : 'hover:bg-[#f7f9f6]'}`}>
       <CollectionPreview documents={documents} />
 
       <div className="min-w-0">
-        <h3 className="truncate font-serif text-[18px] leading-tight text-[#1e302b]">
-          <a href={`#collection/${collection.id}`} className="hover:underline">{collection.name}</a>
-        </h3>
-        <p className="mt-1 truncate text-xs text-[#8a9790]">
-          {collection.description || 'No description'}
-        </p>
+        {isEditing ? (
+          <EditCollectionForm
+            collection={collection}
+            onCancel={() => setIsEditing(false)}
+            onSaved={(updated) => {
+              onCollectionUpdated(updated)
+              setIsEditing(false)
+            }}
+          />
+        ) : (
+          <>
+            <h3 className="truncate font-serif text-[18px] leading-tight text-[#1e302b]">
+              <a href={`#collection/${collection.id}`} className="hover:underline">{collection.name}</a>
+            </h3>
+            <p className="mt-1 truncate text-xs text-[#8a9790]">
+              {collection.description || 'No description'}
+            </p>
+          </>
+        )}
         {(fileTypes.length > 0 || collection.is_public === false) && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {collection.is_public === false && (
@@ -49,12 +138,22 @@ function OwnCollectionRow({ collection, documents }) {
       <span className="hidden text-sm text-[#55615b] sm:block">
         {formatDate(collection.created_at)}
       </span>
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
+        disabled={isEditing}
+        className="rounded-md p-1.5 text-[#6e7975] transition-colors hover:bg-[#edf1ed] hover:text-[#1e3b35] disabled:invisible"
+        title="Edit name and description"
+        aria-label={`Edit ${collection.name}`}
+      >
+        <Pencil className="size-4" />
+      </button>
     </li>
   )
 }
 
 /** Dashboard for the logged-in user: account details and their own collections. */
-export function ProfilePage({ user, collections, isLoading, onLogin, onCreateCollection }) {
+export function ProfilePage({ user, collections, isLoading, onLogin, onCreateCollection, onCollectionUpdated }) {
   // Documents per collection id; a missing key means still loading.
   const [documentsByCollection, setDocumentsByCollection] = useState({})
 
@@ -171,6 +270,7 @@ export function ProfilePage({ user, collections, isLoading, onLogin, onCreateCol
               <span className="hidden sm:block">Files</span>
               <span className="text-right sm:text-left">Size</span>
               <span className="hidden sm:block">Created</span>
+              <span />
             </div>
             <ul className="divide-y divide-[#edf0ed]">
               {ownCollections.map((collection) => (
@@ -178,6 +278,7 @@ export function ProfilePage({ user, collections, isLoading, onLogin, onCreateCol
                   key={collection.id}
                   collection={collection}
                   documents={documentsByCollection[collection.id]}
+                  onCollectionUpdated={onCollectionUpdated}
                 />
               ))}
             </ul>
