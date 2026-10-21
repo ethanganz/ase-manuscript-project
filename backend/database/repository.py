@@ -21,7 +21,7 @@ class Repository:
     def get_user_by_email(self, email: str) -> Optional[dict]: ...
 
     def create_collection(self, name: str, description: Optional[str],
-                          owner_id: str) -> dict: ...
+                          owner_id: str, is_public: bool = True) -> dict: ...
     def list_collections(self) -> list[dict]: ...
     def get_collection(self, collection_id: str) -> Optional[dict]: ...
 
@@ -68,10 +68,10 @@ class InMemoryRepository(Repository):
         row = next((u for u in self.users.values() if u["email"] == email), None)
         return dict(row) if row else None
 
-    def create_collection(self, name, description, owner_id):
+    def create_collection(self, name, description, owner_id, is_public=True):
         """Create and store a collection."""
         row = {"id": str(uuid4()), "name": name, "description": description,
-               "owner_id": owner_id, "created_at": self._now()}
+               "owner_id": owner_id, "is_public": is_public, "created_at": self._now()}
         self.collections[row["id"]] = row
         return dict(row)
 
@@ -158,10 +158,11 @@ class SupabaseRepository(Repository):
         res = self._t("users").select("*").eq("email", email).limit(1).execute()
         return res.data[0] if res.data else None
 
-    def create_collection(self, name, description, owner_id):
+    def create_collection(self, name, description, owner_id, is_public=True):
         """Create a collection in Supabase."""
         res = self._t("collections").insert(
-            {"name": name, "description": description, "owner_id": owner_id}).execute()
+            {"name": name, "description": description, "owner_id": owner_id,
+             "is_public": is_public}).execute()
         return res.data[0]
 
     def list_collections(self):

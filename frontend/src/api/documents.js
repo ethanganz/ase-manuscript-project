@@ -30,11 +30,11 @@ export async function getPages(documentId) {
   return response.json()
 }
 
-export async function createCollection(name, description) {
+export async function createCollection(name, description, isPublic = true) {
   const response = await apiFetch('/api/collections', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, description }),
+    body: JSON.stringify({ name, description, is_public: isPublic }),
   })
 
   const data = await response.json().catch(() => ({}))

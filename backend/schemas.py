@@ -65,6 +65,7 @@ class UserOut(BaseModel):
 class CollectionCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: Optional[str] = Field(default=None, max_length=2000)
+    is_public: bool = True   # False = only the owner can see it
 
 
 # Response model for returning collection data.
@@ -73,6 +74,7 @@ class CollectionOut(BaseModel):
     name: str
     description: Optional[str] = None
     owner_id: Optional[UUID] = None   # None for collections made before accounts existed
+    is_public: bool = True
     created_at: Optional[datetime] = None
 
 

@@ -1,4 +1,4 @@
-import { ArrowUpRight, MoreHorizontal, Search } from 'lucide-react'
+import { ArrowUpRight, Lock, MoreHorizontal, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { CollectionPreview } from '../tools/helpers.jsx'
 
@@ -16,6 +16,9 @@ function CollectionCard({ collection }) {
             <a href={`#collection/${collection.id}`} className="after:absolute after:inset-0 after:rounded-xl">
               {collection.name}
             </a>
+            {collection.is_public === false && (
+              <Lock className="ml-1.5 inline size-3.5 align-baseline text-[#8a9790]" aria-label="Private" />
+            )}
           </h3>
           <p className="mt-1 text-xs text-[#8a9790]">
             {collection.description || 'No description'}

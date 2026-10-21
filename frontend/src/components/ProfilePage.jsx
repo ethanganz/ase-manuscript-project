@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarDays, FileText, FolderOpen, HardDrive, Mail, Plus } from 'lucide-react'
+import { ArrowLeft, CalendarDays, FileText, FolderOpen, HardDrive, Lock, Mail, Plus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getDocuments } from '../api/documents.js'
 import { CollectionPreview, formatBytes, formatDate, StatCard } from '../tools/helpers.jsx'
@@ -23,8 +23,14 @@ function OwnCollectionRow({ collection, documents }) {
         <p className="mt-1 truncate text-xs text-[#8a9790]">
           {collection.description || 'No description'}
         </p>
-        {fileTypes.length > 0 && (
+        {(fileTypes.length > 0 || collection.is_public === false) && (
           <div className="mt-2 flex flex-wrap gap-1.5">
+            {collection.is_public === false && (
+              <span className="inline-flex items-center gap-1 rounded bg-[#f6efe1] px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#8a6d3b]">
+                <Lock className="size-2.5" />
+                PRIVATE
+              </span>
+            )}
             {fileTypes.map((type) => (
               <span key={type} className="rounded bg-[#edf1ed] px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-[#55615b]">
                 {type}

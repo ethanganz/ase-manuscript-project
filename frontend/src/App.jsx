@@ -35,6 +35,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [collectionName, setCollectionName] = useState('')
   const [collectionDescription, setCollectionDescription] = useState('')
+  const [collectionIsPublic, setCollectionIsPublic] = useState(true)
   const [selectedCollectionFiles, setSelectedCollectionFiles] = useState([])
   const [creatingCollection, setCreatingCollection] = useState(false)
   const [collectionError, setCollectionError] = useState('')
@@ -106,7 +107,8 @@ function App() {
     return () => {
       if (timer) clearTimeout(timer)
     }
-  }, [])
+    // Reload on login/logout: private collections are only listed for their owner.
+  }, [user?.id])
 
   async function handleUpload(event) {
     event.preventDefault()
@@ -157,6 +159,7 @@ function App() {
         const collection = await createCollection(
           collectionName.trim(),
           collectionDescription.trim(),
+          collectionIsPublic,
         )
         collectionId = collection.id
         // Remember it right away, so a retry uploads into it
@@ -172,6 +175,7 @@ function App() {
       setSelectedCollection(collectionId)
       setCollectionName('')
       setCollectionDescription('')
+      setCollectionIsPublic(true)
       setSelectedCollectionFiles([])
       event.target.reset()
 
@@ -266,6 +270,8 @@ function App() {
         onCollectionChange={setSelectedCollection}
         name={collectionName}
         description={collectionDescription}
+        isPublic={collectionIsPublic}
+        onIsPublicChange={setCollectionIsPublic}
         selectedFiles={selectedCollectionFiles}
         submitting={creatingCollection}
         error={collectionError}
