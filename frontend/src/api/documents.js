@@ -1,5 +1,7 @@
+import { apiFetch } from './auth.js'
+
 export async function getCollections() {
-  const response = await fetch('/api/collections')
+  const response = await apiFetch('/api/collections')
 
   if (!response.ok) {
     throw new Error('Unable to load collections')
@@ -9,7 +11,7 @@ export async function getCollections() {
 }
 
 export async function createCollection(name, description) {
-  const response = await fetch('/api/collections', {
+  const response = await apiFetch('/api/collections', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, description }),
@@ -30,7 +32,7 @@ export async function uploadFiles(collectionId, files) {
     formData.append('files', file) // same field name repeated = many files
   }
 
-  const response = await fetch(`/api/collections/${collectionId}/uploads`, {
+  const response = await apiFetch(`/api/collections/${collectionId}/uploads`, {
     method: 'POST',
     body: formData, // do not set Content-Type, the browser adds it
   })
