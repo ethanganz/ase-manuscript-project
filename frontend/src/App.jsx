@@ -7,10 +7,14 @@ import { Hero } from './components/Hero.jsx'
 // import { ResearchSection } from './components/ResearchSection.jsx'
 // import { collections as sampleCollections, places } from './data/collections.js'
 import { createCollection, getCollections, uploadDocument, uploadFiles } from './api/documents.js'
+import { SESSION_ENDED_EVENT, getCurrentUser, logout } from './api/auth.js'
+import { AuthModal } from './components/AuthModal.jsx'
 
 import { MapSection } from './components/MapSection.jsx'
 
 function App() {
+  const [user, setUser] = useState(null)
+  const [isAuthOpen, setIsAuthOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [remoteCollections, setRemoteCollections] = useState([])
   const [selectedCollection, setSelectedCollection] = useState('')
@@ -25,6 +29,33 @@ function App() {
   const [creatingCollection, setCreatingCollection] = useState(false)
   const [collectionError, setCollectionError] = useState('')
   const [loadingCollections, setLoadingCollections] = useState(true)
+
+  useEffect(() => {
+    getCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null))
+
+    // Any API call answering 401 means the login expired.
+    const onSessionEnded = () => setUser(null)
+    window.addEventListener(SESSION_ENDED_EVENT, onSessionEnded)
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded)
+  }, [])
+
+  async function handleLogout() {
+    await logout()
+    setUser(null)
+    setIsModalOpen(false)
+  }
+
+  function handleAuthenticated(loggedInUser) {
+    setUser(loggedInUser)
+    setIsAuthOpen(false)
+  }
+
+  // Users can only upload into collections they own.
+  const ownCollections = user
+    ? remoteCollections.filter((collection) => collection.owner_id === user.id)
+    : []
 
   useEffect(() => {
     let timer = null
@@ -132,6 +163,13 @@ function App() {
   }
 
   function openCollectionModal() {
+    if (!user) {
+      setIsAuthOpen(true)
+      return
+    }
+    if (!ownCollections.some((collection) => collection.id === selectedCollection)) {
+      setSelectedCollection(ownCollections[0]?.id || '')
+    }
     setCollectionError('')
     setSelectedCollectionFiles([])
     setIsModalOpen(true)
@@ -139,7 +177,7 @@ function App() {
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] text-[#1e2a27]">
-      <Header />
+      <Header user={user} onLogin={() => setIsAuthOpen(true)} onLogout={handleLogout} />
 
       <div id="top" className="mx-auto max-w-[1120px] px-6 py-14 lg:px-8 lg:py-20">
         <Hero onCreateCollection={openCollectionModal} />
@@ -166,7 +204,7 @@ function App() {
 
       <CreateCollectionModal
         isOpen={isModalOpen}
-        collections={remoteCollections}
+        collections={ownCollections}
         selectedCollectionId={selectedCollection}
         onCollectionChange={setSelectedCollection}
         name={collectionName}
@@ -179,6 +217,12 @@ function App() {
         onFileChange={setSelectedCollectionFiles}
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateCollection}
+      />
+
+      <AuthModal
+        isOpen={isAuthOpen}
+        onAuthenticated={handleAuthenticated}
+        onClose={() => setIsAuthOpen(false)}
       />
     </main>
   )

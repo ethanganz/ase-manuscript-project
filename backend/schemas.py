@@ -1,13 +1,63 @@
+import re
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, field_validator
+
+from services.auth import MAX_PASSWORD_BYTES
 
 '''
     This defines the shape of the data the API sends back, such as what a collection or a page looks like.
 
 '''
+
+
+EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+
+def _normalize_email(value: str) -> str:
+    value = value.strip().lower()
+    if not EMAIL_RE.fullmatch(value):
+        raise ValueError("Enter a valid email address")
+    return value
+
+
+# Emails are stored lowercase so "Anna@Mail.com" and "anna@mail.com" match.
+Email = Annotated[str, Field(max_length=254), AfterValidator(_normalize_email)]
+
+
+# A first or last name: surrounding spaces removed, cannot be empty.
+Name = Annotated[str, AfterValidator(str.strip), Field(min_length=1, max_length=100)]
+
+
+# Request model for signing up.
+class UserCreate(BaseModel):
+    first_name: Name
+    last_name: Name
+    email: Email
+    password: str = Field(min_length=8, max_length=MAX_PASSWORD_BYTES)
+
+    @field_validator("password")
+    @classmethod
+    def password_fits_bcrypt(cls, value: str) -> str:
+        if len(value.encode()) > MAX_PASSWORD_BYTES:
+            raise ValueError("Password is too long")
+        return value
+
+
+# Request model for logging in.
+class UserLogin(BaseModel):
+    email: Email
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_BYTES)
+
+
+# Response model for returning user data. Never includes the password hash.
+class UserOut(BaseModel):
+    id: UUID
+    email: str
+    display_name: Optional[str] = None   # "First Last"
+    created_at: Optional[datetime] = None
 
 
 # Request model for creating a new collection.
@@ -21,6 +71,7 @@ class CollectionOut(BaseModel):
     id: UUID
     name: str
     description: Optional[str] = None
+    owner_id: Optional[UUID] = None   # None for collections made before accounts existed
     created_at: Optional[datetime] = None
 
 

@@ -41,7 +41,7 @@ def test_rows_without_country_are_ignored_and_codes_normalised(client, collectio
 
 
 def test_other_collections_are_not_mixed_in(client, collection, repo):
-    other = repo.create_collection("Other", None)
+    other = repo.create_collection("Other", None, repo.get_collection(collection["id"])["owner_id"])
     repo.mention_details += [mention(other["id"], "Rome", "IT")]
     assert client.get(f"/api/collections/{collection['id']}/map/countries").json() == []
 

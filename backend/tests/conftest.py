@@ -26,13 +26,25 @@ def storage():
 
 
 @pytest.fixture
-def client(repo, storage):
-    """TestClient with an in-memory DB and in-memory object storage."""
+def anon_client(repo, storage):
+    """TestClient with an in-memory DB and in-memory object storage, not logged in."""
     app.dependency_overrides[get_repo] = lambda: repo
     app.dependency_overrides[get_storage] = lambda: storage
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+def register(client, email="ada@example.com", password="correct-horse"):
+    return client.post("/api/auth/register", json={
+        "first_name": "Ada", "last_name": "Lovelace", "email": email, "password": password})
+
+
+@pytest.fixture
+def client(anon_client):
+    """TestClient logged in as a registered user."""
+    assert register(anon_client).status_code == 201
+    return anon_client
 
 
 @pytest.fixture

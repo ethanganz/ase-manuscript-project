@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import documents, names
 from routes import map as map_routes
 
-from routes import collections, documents, names
+from routes import auth, collections, documents, names
 
 app = FastAPI(title="ASE Manuscript Project")
 
@@ -22,6 +22,7 @@ def health():
     return {"status": "ok"}
 
 
+app.include_router(auth.router)
 app.include_router(names.router)
 app.include_router(collections.router)
 app.include_router(documents.router)
