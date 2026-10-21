@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from database.repository import Repository
 from services.storage import ObjectStorage
-from deps import get_repo, get_storage
+from deps import get_current_user, get_repo, get_storage
 from schemas import (CollectionCreate, CollectionOut, DocumentOut, FileResult,
                      UploadReport)
 from services.ingest import ingest_upload
@@ -21,11 +21,12 @@ def _require_collection(repo: Repository, collection_id: UUID) -> dict:
 
 
 @router.post("", response_model=CollectionOut, status_code=201)
-def create_collection(payload: CollectionCreate, repo: Repository = Depends(get_repo)):
+def create_collection(payload: CollectionCreate, repo: Repository = Depends(get_repo),
+                      user: dict = Depends(get_current_user)):
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=422, detail="Name cannot be empty")
-    return repo.create_collection(name, payload.description)
+    return repo.create_collection(name, payload.description, user["id"])
 
 
 @router.get("", response_model=list[CollectionOut])
@@ -52,13 +53,17 @@ def upload_files(
     files: list[UploadFile] = File(...),
     repo: Repository = Depends(get_repo),
     storage: ObjectStorage = Depends(get_storage),
+    user: dict = Depends(get_current_user),
 ):
     """Bulk upload: PDF, JPG/JPEG, PNG, heic or ZIP of those. Multiple files allowed.
 
-    Returns a per-file report. Status 201 if at least one file was accepted,
-    422 if every file was rejected.
+    Only the owner of the collection may upload. Returns a per-file report.
+    Status 201 if at least one file was accepted, 422 if every file was rejected.
     """
-    _require_collection(repo, collection_id)
+    collection = _require_collection(repo, collection_id)
+    if collection.get("owner_id") != user["id"]:
+        raise HTTPException(status_code=403,
+                            detail="You can only upload to your own collections")
 
     results: list[FileResult] = []
     for upload in files:

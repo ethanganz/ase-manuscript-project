@@ -1,4 +1,5 @@
 import os
+import secrets
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -12,6 +13,13 @@ load_dotenv(BASE_DIR / ".env")
 # --- Supabase (server-side only - never expose the API key to the client) ---
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY", "")
+
+JWT_SECRET = os.getenv("JWT_SECRET") or secrets.token_urlsafe(48)
+
+JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", str(7 * 24 * 60)))
+
+AUTH_COOKIE_NAME = "access_token"
+AUTH_COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
 
 # --- Upload pipeline -------------------------------------------------------
 # Permanent files are stored in Supabase Storage.

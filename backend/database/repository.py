@@ -15,7 +15,13 @@ from database.paging import fetch_all
 class Repository:
     """Common interface for data access."""
 
-    def create_collection(self, name: str, description: Optional[str]) -> dict: ...
+    def create_user(self, email: str, password_hash: str,
+                    display_name: Optional[str]) -> dict: ...
+    def get_user(self, user_id: str) -> Optional[dict]: ...
+    def get_user_by_email(self, email: str) -> Optional[dict]: ...
+
+    def create_collection(self, name: str, description: Optional[str],
+                          owner_id: str) -> dict: ...
     def list_collections(self) -> list[dict]: ...
     def get_collection(self, collection_id: str) -> Optional[dict]: ...
 
@@ -34,6 +40,7 @@ class InMemoryRepository(Repository):
     """In-memory repository used for tests."""
 
     def __init__(self) -> None:
+        self.users: dict[str, dict] = {}
         self.collections: dict[str, dict] = {}
         self.documents: dict[str, dict] = {}
         self.pages: dict[str, dict] = {}
@@ -44,10 +51,27 @@ class InMemoryRepository(Repository):
         """Return the current UTC timestamp."""
         return datetime.now(timezone.utc).isoformat()
 
-    def create_collection(self, name, description):
+    def create_user(self, email, password_hash, display_name):
+        """Create and store a user."""
+        row = {"id": str(uuid4()), "email": email, "password_hash": password_hash,
+               "display_name": display_name, "created_at": self._now()}
+        self.users[row["id"]] = row
+        return dict(row)
+
+    def get_user(self, user_id):
+        """Return a user by ID."""
+        row = self.users.get(user_id)
+        return dict(row) if row else None
+
+    def get_user_by_email(self, email):
+        """Return a user by email."""
+        row = next((u for u in self.users.values() if u["email"] == email), None)
+        return dict(row) if row else None
+
+    def create_collection(self, name, description, owner_id):
         """Create and store a collection."""
         row = {"id": str(uuid4()), "name": name, "description": description,
-               "created_at": self._now()}
+               "owner_id": owner_id, "created_at": self._now()}
         self.collections[row["id"]] = row
         return dict(row)
 
@@ -117,10 +141,27 @@ class SupabaseRepository(Repository):
         """Return a Supabase table client."""
         return self._sb().table(name)
 
-    def create_collection(self, name, description):
+    def create_user(self, email, password_hash, display_name):
+        """Create a user in Supabase."""
+        res = self._t("users").insert(
+            {"email": email, "password_hash": password_hash,
+             "display_name": display_name}).execute()
+        return res.data[0]
+
+    def get_user(self, user_id):
+        """Return a user by ID."""
+        res = self._t("users").select("*").eq("id", user_id).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def get_user_by_email(self, email):
+        """Return a user by email."""
+        res = self._t("users").select("*").eq("email", email).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def create_collection(self, name, description, owner_id):
         """Create a collection in Supabase."""
         res = self._t("collections").insert(
-            {"name": name, "description": description}).execute()
+            {"name": name, "description": description, "owner_id": owner_id}).execute()
         return res.data[0]
 
     def list_collections(self):
