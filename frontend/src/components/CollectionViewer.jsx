@@ -1,4 +1,4 @@
-import 'leaflet/dist/leaflet.css'
+import "leaflet/dist/leaflet.css";
 import {
   ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Expand, FileText, Flag, MapPin,
   Maximize2, Minimize2, Shrink, ZoomIn, ZoomOut,
@@ -11,22 +11,49 @@ import { getMockPlaces, getMockTranscription } from '../data/mockTranscriptions.
 import { countryDisplayName } from '../libraray/countries.js'
 import { useFetch } from '../libraray/useFetch.js'
 import { ReportCollectionModal } from './ReportCollectionModal.jsx'
+  ArrowLeft,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Expand,
+  FileText,
+  MapPin,
+  Maximize2,
+  Minimize2,
+  Shrink,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
+import { getDocuments, getPages } from "../api/documents.js";
+import { pageImageUrl } from "../api/map.js";
+import {
+  getMockPlaces,
+  getMockTranscription,
+} from "../data/mockTranscriptions.js";
+import { countryDisplayName } from "../libraray/countries.js";
+import { useFetch } from "../libraray/useFetch.js";
 
 // On large screens the viewer fills the window below the 76px header (minus
 // the 2rem App padding), so page and transcription show without scrolling.
 // Smaller screens stack the panels, each 70% of the window high.
-const VIEWER_HEIGHT = 'lg:h-[calc(100dvh-76px-2rem)]'
-const PANEL = 'flex h-[70vh] min-h-0 flex-col overflow-hidden rounded-xl border border-[#e0e6e0] bg-white lg:h-full'
-const PANEL_BAR = 'flex h-11 shrink-0 items-center justify-between gap-3 border-b border-[#edf0ed] px-3'
-const ICON_BUTTON = 'rounded p-1.5 text-[#55615b] transition-colors hover:bg-[#edf1ed] disabled:opacity-30'
-const ZOOM_STEPS = [1, 1.5, 2, 3]
+const VIEWER_HEIGHT = "lg:h-[calc(100dvh-76px-2rem)]";
+const PANEL =
+  "flex h-[70vh] min-h-0 flex-col overflow-hidden rounded-xl border border-[#e0e6e0] bg-white lg:h-full";
+const PANEL_BAR =
+  "flex h-11 shrink-0 items-center justify-between gap-3 border-b border-[#edf0ed] px-3";
+const ICON_BUTTON =
+  "rounded p-1.5 text-[#55615b] transition-colors hover:bg-[#edf1ed] disabled:opacity-30";
+const ZOOM_STEPS = [1, 1.5, 2, 3];
 
 function MockBadge() {
   return (
     <span className="shrink-0 rounded-full bg-[#f6efe1] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8a6d3b]">
       Mock data
     </span>
-  )
+  );
 }
 
 /** Maximize one panel, or go back to both side by side. */
@@ -36,20 +63,36 @@ function FocusButton({ isFocused, onToggle, label }) {
       type="button"
       onClick={onToggle}
       className={`${ICON_BUTTON} hidden lg:block`}
-      title={isFocused ? 'Show page and transcription side by side' : `Maximize ${label}`}
-      aria-label={isFocused ? 'Show page and transcription side by side' : `Maximize ${label}`}
+      title={
+        isFocused
+          ? "Show page and transcription side by side"
+          : `Maximize ${label}`
+      }
+      aria-label={
+        isFocused
+          ? "Show page and transcription side by side"
+          : `Maximize ${label}`
+      }
     >
-      {isFocused ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+      {isFocused ? (
+        <Minimize2 className="size-4" />
+      ) : (
+        <Maximize2 className="size-4" />
+      )}
     </button>
-  )
+  );
 }
 
 /** Row of documents to switch between. */
 function DocumentTabs({ documents, selectedId, onSelect }) {
   return (
-    <div className="flex shrink-0 gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Documents">
+    <div
+      className="flex shrink-0 gap-2 overflow-x-auto pb-1"
+      role="tablist"
+      aria-label="Documents"
+    >
       {documents.map((doc) => {
-        const isSelected = doc.id === selectedId
+        const isSelected = doc.id === selectedId;
         return (
           <button
             key={doc.id}
@@ -59,67 +102,111 @@ function DocumentTabs({ documents, selectedId, onSelect }) {
             onClick={() => onSelect(doc.id)}
             className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
               isSelected
-                ? 'border-[#1e3b35] bg-[#1e3b35] text-white'
-                : 'border-[#dfe5df] bg-white text-[#55615b] hover:border-[#c3d2c7] hover:bg-[#f7f9f6]'
+                ? "border-[#1e3b35] bg-[#1e3b35] text-white"
+                : "border-[#dfe5df] bg-white text-[#55615b] hover:border-[#c3d2c7] hover:bg-[#f7f9f6]"
             }`}
           >
             <FileText className="size-4 shrink-0" />
-            <span className="max-w-[200px] truncate">{doc.original_filename}</span>
-            <span className={`text-[10px] font-semibold tracking-wide ${isSelected ? 'text-white/70' : 'text-[#8a9790]'}`}>
+            <span className="max-w-[200px] truncate">
+              {doc.original_filename}
+            </span>
+            <span
+              className={`text-[10px] font-semibold tracking-wide ${isSelected ? "text-white/70" : "text-[#8a9790]"}`}
+            >
               {doc.file_type.toUpperCase()}
             </span>
           </button>
-        )
+        );
       })}
     </div>
-  )
+  );
 }
 
 /** Left side: the page image, fitted to the panel, with page and zoom controls. */
-function PageImagePanel({ document, pages, pageIndex, onPageChange, loading, isFocused, onToggleFocus }) {
-  const [zoom, setZoom] = useState(1) // 1 = whole page fits the panel
-  const page = pages[pageIndex]
-  const zoomStep = ZOOM_STEPS.indexOf(zoom)
+function PageImagePanel({
+  document,
+  pages,
+  pageIndex,
+  onPageChange,
+  loading,
+  isFocused,
+  onToggleFocus,
+}) {
+  const [zoom, setZoom] = useState(1); // 1 = whole page fits the panel
+  const page = pages[pageIndex];
+  const zoomStep = ZOOM_STEPS.indexOf(zoom);
 
   return (
     <div className={PANEL}>
       <div className={PANEL_BAR}>
-        <p className="min-w-0 truncate text-sm font-medium text-[#1e302b]">{document.original_filename}</p>
+        <p className="min-w-0 truncate text-sm font-medium text-[#1e302b]">
+          {document.original_filename}
+        </p>
 
         <div className="flex shrink-0 items-center gap-0.5 text-xs text-[#6e7975]">
           {pages.length > 1 && (
             <>
-              <button type="button" onClick={() => onPageChange(pageIndex - 1)} disabled={pageIndex === 0}
-                className={ICON_BUTTON} aria-label="Previous page">
+              <button
+                type="button"
+                onClick={() => onPageChange(pageIndex - 1)}
+                disabled={pageIndex === 0}
+                className={ICON_BUTTON}
+                aria-label="Previous page"
+              >
                 <ChevronLeft className="size-4" />
               </button>
-              <span className="px-1 tabular-nums">{pageIndex + 1} / {pages.length}</span>
-              <button type="button" onClick={() => onPageChange(pageIndex + 1)} disabled={pageIndex === pages.length - 1}
-                className={ICON_BUTTON} aria-label="Next page">
+              <span className="px-1 tabular-nums">
+                {pageIndex + 1} / {pages.length}
+              </span>
+              <button
+                type="button"
+                onClick={() => onPageChange(pageIndex + 1)}
+                disabled={pageIndex === pages.length - 1}
+                className={ICON_BUTTON}
+                aria-label="Next page"
+              >
                 <ChevronRight className="size-4" />
               </button>
               <span className="mx-1 h-4 w-px bg-[#e0e6e0]" />
             </>
           )}
-          <button type="button" onClick={() => setZoom(ZOOM_STEPS[zoomStep - 1])} disabled={zoomStep === 0}
-            className={ICON_BUTTON} aria-label="Zoom out">
+          <button
+            type="button"
+            onClick={() => setZoom(ZOOM_STEPS[zoomStep - 1])}
+            disabled={zoomStep === 0}
+            className={ICON_BUTTON}
+            aria-label="Zoom out"
+          >
             <ZoomOut className="size-4" />
           </button>
-          <button type="button" onClick={() => setZoom(1)} className="w-11 rounded py-1 tabular-nums hover:bg-[#edf1ed]"
-            title="Fit page">
-            {zoom === 1 ? 'Fit' : `${zoom * 100}%`}
+          <button
+            type="button"
+            onClick={() => setZoom(1)}
+            className="w-11 rounded py-1 tabular-nums hover:bg-[#edf1ed]"
+            title="Fit page"
+          >
+            {zoom === 1 ? "Fit" : `${zoom * 100}%`}
           </button>
-          <button type="button" onClick={() => setZoom(ZOOM_STEPS[zoomStep + 1])} disabled={zoomStep === ZOOM_STEPS.length - 1}
-            className={ICON_BUTTON} aria-label="Zoom in">
+          <button
+            type="button"
+            onClick={() => setZoom(ZOOM_STEPS[zoomStep + 1])}
+            disabled={zoomStep === ZOOM_STEPS.length - 1}
+            className={ICON_BUTTON}
+            aria-label="Zoom in"
+          >
             <ZoomIn className="size-4" />
           </button>
-          <FocusButton isFocused={isFocused} onToggle={onToggleFocus} label="page" />
+          <FocusButton
+            isFocused={isFocused}
+            onToggle={onToggleFocus}
+            label="page"
+          />
         </div>
       </div>
 
       <div
         className={`min-h-0 flex-1 overflow-auto bg-[#f2f4f1] p-3 ${
-          zoom === 1 ? 'flex items-center justify-center' : ''
+          zoom === 1 ? "flex items-center justify-center" : ""
         }`}
       >
         {loading ? (
@@ -129,60 +216,85 @@ function PageImagePanel({ document, pages, pageIndex, onPageChange, loading, isF
             key={page.id}
             src={pageImageUrl(page.id)}
             alt={`${document.original_filename}, page ${page.page_number}`}
-            style={zoom === 1 ? undefined : { width: `${zoom * 100}%`, maxWidth: 'none' }}
+            style={
+              zoom === 1
+                ? undefined
+                : { width: `${zoom * 100}%`, maxWidth: "none" }
+            }
             className={`mx-auto shadow-[0_4px_16px_rgba(30,42,39,0.12)] ${
-              zoom === 1 ? 'max-h-full max-w-full object-contain' : 'h-auto'
+              zoom === 1 ? "max-h-full max-w-full object-contain" : "h-auto"
             }`}
           />
         ) : (
-          <p className="text-sm text-[#7e8b85]">No pages available for this file.</p>
+          <p className="text-sm text-[#7e8b85]">
+            No pages available for this file.
+          </p>
         )}
       </div>
     </div>
-  )
+  );
 }
 
 /** Wraps every place name in a line with a highlight. */
 function highlightPlaces(line, places) {
-  if (places.length === 0) return line
-  const pattern = new RegExp(`(${places.map((place) => place.name).join('|')})`, 'g')
+  if (places.length === 0) return line;
+  const pattern = new RegExp(
+    `(${places.map((place) => place.name).join("|")})`,
+    "g",
+  );
   return line.split(pattern).map((part, index) =>
     places.some((place) => place.name === part) ? (
-      <mark key={index} className="rounded bg-[#e3ece5] px-0.5 text-[#1e3b35]">{part}</mark>
+      <mark key={index} className="rounded bg-[#e3ece5] px-0.5 text-[#1e3b35]">
+        {part}
+      </mark>
     ) : (
       part
     ),
-  )
+  );
 }
 
 /** Right side: the transcription of the current page. */
-function TranscriptionPanel({ lines, places, pageNumber, isFocused, onToggleFocus }) {
+function TranscriptionPanel({
+  lines,
+  places,
+  pageNumber,
+  isFocused,
+  onToggleFocus,
+}) {
   return (
     <div className={PANEL}>
       <div className={PANEL_BAR}>
-        <p className="truncate text-sm font-medium text-[#1e302b]">Transcription · page {pageNumber}</p>
+        <p className="truncate text-sm font-medium text-[#1e302b]">
+          Transcription · page {pageNumber}
+        </p>
         <div className="flex shrink-0 items-center gap-2">
           <MockBadge />
-          <FocusButton isFocused={isFocused} onToggle={onToggleFocus} label="transcription" />
+          <FocusButton
+            isFocused={isFocused}
+            onToggle={onToggleFocus}
+            label="transcription"
+          />
         </div>
       </div>
 
       <ol className="min-h-0 flex-1 overflow-auto px-4 py-4 font-serif text-[16px] leading-8 text-[#2a3833]">
         {lines.map((line, index) => (
           <li key={index} className="grid grid-cols-[2rem_1fr] gap-3">
-            <span className="select-none text-right font-sans text-xs leading-8 text-[#b0bab5]">{index + 1}</span>
-            <span>{line ? highlightPlaces(line, places) : ' '}</span>
+            <span className="select-none text-right font-sans text-xs leading-8 text-[#b0bab5]">
+              {index + 1}
+            </span>
+            <span>{line ? highlightPlaces(line, places) : " "}</span>
           </li>
         ))}
       </ol>
     </div>
-  )
+  );
 }
 
 /** Bottom bar: the places on this page. Collapsed by default; opens a small map. */
 function PlacesBar({ places, mapKey }) {
-  const [isOpen, setIsOpen] = useState(false)
-  const hasPlaces = places.length > 0
+  const [isOpen, setIsOpen] = useState(false);
+  const hasPlaces = places.length > 0;
 
   return (
     <section className="shrink-0 overflow-hidden rounded-xl border border-[#e0e6e0] bg-white">
@@ -194,23 +306,36 @@ function PlacesBar({ places, mapKey }) {
         className="flex h-11 w-full items-center gap-3 px-3 text-left disabled:cursor-default"
       >
         <MapPin className="size-4 shrink-0 text-[#6f8e7b]" />
-        <span className="shrink-0 text-sm font-medium text-[#1e302b]">Places</span>
+        <span className="shrink-0 text-sm font-medium text-[#1e302b]">
+          Places
+        </span>
         <span className="flex min-w-0 flex-1 gap-1.5 overflow-hidden">
           {hasPlaces ? (
             places.map((place) => (
-              <span key={place.name} className="shrink-0 rounded-full bg-[#edf1ed] px-2 py-0.5 text-xs text-[#476d5b]">
+              <span
+                key={place.name}
+                className="shrink-0 rounded-full bg-[#edf1ed] px-2 py-0.5 text-xs text-[#476d5b]"
+              >
                 {place.name}
               </span>
             ))
           ) : (
-            <span className="text-xs text-[#8a9790]">No places mentioned on this page</span>
+            <span className="text-xs text-[#8a9790]">
+              No places mentioned on this page
+            </span>
           )}
         </span>
         <MockBadge />
         {hasPlaces && (
           <span className="flex shrink-0 items-center gap-1 text-xs text-[#6e7975]">
-            <span className="hidden sm:inline">{isOpen ? 'Hide map' : 'Show map'}</span>
-            {isOpen ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}
+            <span className="hidden sm:inline">
+              {isOpen ? "Hide map" : "Show map"}
+            </span>
+            {isOpen ? (
+              <ChevronDown className="size-4" />
+            ) : (
+              <ChevronUp className="size-4" />
+            )}
           </span>
         )}
       </button>
@@ -235,7 +360,12 @@ function PlacesBar({ places, mapKey }) {
                   key={place.name}
                   center={[place.lat, place.lng]}
                   radius={8}
-                  pathOptions={{ color: '#1e3b35', fillColor: '#6f8e7b', fillOpacity: 0.85, weight: 2 }}
+                  pathOptions={{
+                    color: "#1e3b35",
+                    fillColor: "#6f8e7b",
+                    fillOpacity: 0.85,
+                    weight: 2,
+                  }}
                 >
                   <Tooltip>{place.name}</Tooltip>
                 </CircleMarker>
@@ -246,9 +376,12 @@ function PlacesBar({ places, mapKey }) {
           <ul className="max-h-[200px] divide-y divide-[#edf0ed] overflow-auto border-t border-[#edf0ed] md:border-l md:border-t-0">
             {places.map((place) => (
               <li key={place.name} className="px-4 py-2.5">
-                <p className="text-sm font-medium text-[#1e302b]">{place.name}</p>
+                <p className="text-sm font-medium text-[#1e302b]">
+                  {place.name}
+                </p>
                 <p className="text-xs text-[#8a9790]">
-                  {countryDisplayName(place.country_code)} · {place.lat.toFixed(2)}, {place.lng.toFixed(2)}
+                  {countryDisplayName(place.country_code)} ·{" "}
+                  {place.lat.toFixed(2)}, {place.lng.toFixed(2)}
                 </p>
               </li>
             ))}
@@ -256,7 +389,7 @@ function PlacesBar({ places, mapKey }) {
         </div>
       )}
     </section>
-  )
+  );
 }
 
 /**
@@ -268,64 +401,80 @@ export function CollectionViewer({ collectionId, collections, isLoadingCollectio
   const [isReporting, setIsReporting] = useState(false)
   const [pickedDocumentId, setPickedDocumentId] = useState('')
   // Page shown per document, so switching documents keeps your place in each.
-  const [pageIndexByDocument, setPageIndexByDocument] = useState({})
-  const [focus, setFocus] = useState('both') // 'both' | 'page' | 'text'
-  const [isFullScreen, setIsFullScreen] = useState(false)
+  const [pageIndexByDocument, setPageIndexByDocument] = useState({});
+  const [focus, setFocus] = useState("both"); // 'both' | 'page' | 'text'
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
   // Full screen: stop the page behind from scrolling, and leave with Escape.
   useEffect(() => {
-    if (!isFullScreen) return undefined
-    const onKey = (event) => event.key === 'Escape' && setIsFullScreen(false)
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', onKey)
+    if (!isFullScreen) return undefined;
+    const onKey = (event) => event.key === "Escape" && setIsFullScreen(false);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
     return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [isFullScreen])
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [isFullScreen]);
 
-  const collection = collections.find((item) => item.id === collectionId)
+  const collection = collections.find((item) => item.id === collectionId);
 
-  const documentsQuery = useFetch(collectionId, () => getDocuments(collectionId))
-  const documents = documentsQuery.data ?? []
+  const documentsQuery = useFetch(collectionId, () =>
+    getDocuments(collectionId),
+  );
+  const documents = documentsQuery.data ?? [];
 
-  const selectedDocument = documents.find((doc) => doc.id === pickedDocumentId) ?? documents[0]
-  const documentId = selectedDocument?.id ?? ''
+  const selectedDocument =
+    documents.find((doc) => doc.id === pickedDocumentId) ?? documents[0];
+  const documentId = selectedDocument?.id ?? "";
 
-  const pagesQuery = useFetch(documentId, () => getPages(documentId))
-  const pages = pagesQuery.data ?? []
+  const pagesQuery = useFetch(documentId, () => getPages(documentId));
+  const pages = pagesQuery.data ?? [];
 
-  const pageIndex = Math.min(pageIndexByDocument[documentId] ?? 0, Math.max(0, pages.length - 1))
-  const pageNumber = pages[pageIndex]?.page_number ?? 1
+  const pageIndex = Math.min(
+    pageIndexByDocument[documentId] ?? 0,
+    Math.max(0, pages.length - 1),
+  );
+  const pageNumber = pages[pageIndex]?.page_number ?? 1;
 
-  const transcription = documentId ? getMockTranscription(documentId, pageNumber) : []
-  const places = documentId ? getMockPlaces(documentId, pageNumber) : []
+  const transcription = documentId
+    ? getMockTranscription(documentId, pageNumber)
+    : [];
+  const places = documentId ? getMockPlaces(documentId, pageNumber) : [];
 
   function changePage(index) {
-    setPageIndexByDocument((previous) => ({ ...previous, [documentId]: index }))
+    setPageIndexByDocument((previous) => ({
+      ...previous,
+      [documentId]: index,
+    }));
   }
 
   function toggleFocus(panel) {
-    setFocus((current) => (current === panel ? 'both' : panel))
+    setFocus((current) => (current === panel ? "both" : panel));
   }
 
   if (!collection && !isLoadingCollections) {
     return (
       <section className="py-24 text-center">
-        <h1 className="font-serif text-4xl tracking-[-0.04em]">Collection not found</h1>
-        <a href="#collections" className="mt-6 inline-block text-sm text-[#476d5b] underline">
+        <h1 className="font-serif text-4xl tracking-[-0.04em]">
+          Collection not found
+        </h1>
+        <a
+          href="#collections"
+          className="mt-6 inline-block text-sm text-[#476d5b] underline"
+        >
           Back to all collections
         </a>
       </section>
-    )
+    );
   }
 
   return (
     <div
       className={
         isFullScreen
-          ? 'fixed inset-0 z-[3000] flex flex-col gap-3 overflow-auto bg-[#f7f8f5] p-3 lg:overflow-hidden'
+          ? "fixed inset-0 z-[3000] flex flex-col gap-3 overflow-auto bg-[#f7f8f5] p-3 lg:overflow-hidden"
           : `flex flex-col gap-3 ${VIEWER_HEIGHT}`
       }
     >
@@ -340,11 +489,12 @@ export function CollectionViewer({ collectionId, collections, isLoadingCollectio
         </a>
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-serif text-2xl leading-tight tracking-[-0.03em] text-[#1e302b]">
-            {collection?.name ?? '…'}
+            {collection?.name ?? "…"}
           </h1>
           <p className="truncate text-xs text-[#7e8b85]">
-            {collection?.description || 'No description'}
-            {documents.length > 0 && ` · ${documents.length} ${documents.length === 1 ? 'document' : 'documents'}`}
+            {collection?.description || "No description"}
+            {documents.length > 0 &&
+              ` · ${documents.length} ${documents.length === 1 ? "document" : "documents"}`}
           </p>
         </div>
         {/* Anyone but the owner can report; visitors are asked to log in first. */}
@@ -363,10 +513,16 @@ export function CollectionViewer({ collectionId, collections, isLoadingCollectio
           type="button"
           onClick={() => setIsFullScreen((full) => !full)}
           className="flex shrink-0 items-center gap-2 rounded-lg border border-[#dfe5df] bg-white px-3 py-1.5 text-sm text-[#55615b] transition-colors hover:bg-[#f7f9f6]"
-          title={isFullScreen ? 'Exit full screen (Esc)' : 'Full screen'}
+          title={isFullScreen ? "Exit full screen (Esc)" : "Full screen"}
         >
-          {isFullScreen ? <Shrink className="size-4" /> : <Expand className="size-4" />}
-          <span className="hidden sm:inline">{isFullScreen ? 'Exit full screen' : 'Full screen'}</span>
+          {isFullScreen ? (
+            <Shrink className="size-4" />
+          ) : (
+            <Expand className="size-4" />
+          )}
+          <span className="hidden sm:inline">
+            {isFullScreen ? "Exit full screen" : "Full screen"}
+          </span>
         </button>
       </div>
 
@@ -384,28 +540,34 @@ export function CollectionViewer({ collectionId, collections, isLoadingCollectio
       ) : (
         <>
           {documents.length > 1 && (
-            <DocumentTabs documents={documents} selectedId={documentId} onSelect={setPickedDocumentId} />
+            <DocumentTabs
+              documents={documents}
+              selectedId={documentId}
+              onSelect={setPickedDocumentId}
+            />
           )}
 
-          <div className={`grid min-h-0 flex-1 gap-3 ${focus === 'both' ? 'lg:grid-cols-2' : ''}`}>
-            {focus !== 'text' && (
+          <div
+            className={`grid min-h-0 flex-1 gap-3 ${focus === "both" ? "lg:grid-cols-2" : ""}`}
+          >
+            {focus !== "text" && (
               <PageImagePanel
                 document={selectedDocument}
                 pages={pages}
                 pageIndex={pageIndex}
                 onPageChange={changePage}
                 loading={pagesQuery.loading}
-                isFocused={focus === 'page'}
-                onToggleFocus={() => toggleFocus('page')}
+                isFocused={focus === "page"}
+                onToggleFocus={() => toggleFocus("page")}
               />
             )}
-            {focus !== 'page' && (
+            {focus !== "page" && (
               <TranscriptionPanel
                 lines={transcription}
                 places={places}
                 pageNumber={pageNumber}
-                isFocused={focus === 'text'}
-                onToggleFocus={() => toggleFocus('text')}
+                isFocused={focus === "text"}
+                onToggleFocus={() => toggleFocus("text")}
               />
             )}
           </div>
@@ -418,5 +580,5 @@ export function CollectionViewer({ collectionId, collections, isLoadingCollectio
         <ReportCollectionModal collection={collection} onClose={() => setIsReporting(false)} />
       )}
     </div>
-  )
+  );
 }

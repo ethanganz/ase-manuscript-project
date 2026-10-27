@@ -3,6 +3,7 @@ from database.paging import fetch_all
 
 class FakeQuery:
     """Mimics supabase's query: .range(a, b).execute().data"""
+
     def __init__(self, data):
         self.data, self._slice = data, (0, None)
 
@@ -12,7 +13,7 @@ class FakeQuery:
 
     def execute(self):
         a, b = self._slice
-        self.data = self.data[a:b + 1]
+        self.data = self.data[a : b + 1]
         return self
 
 

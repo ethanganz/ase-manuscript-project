@@ -1,20 +1,23 @@
 """Object storage for originals and page images.
-one small place that talks to Supabase Storage. 
+one small place that talks to Supabase Storage.
 so tests can use a fake in-memory version
 
 Production: Supabase Storage (private bucket). Tests: in-memory.
 Keys look like  <collection_id>/<document_id>/original.pdf
                 <collection_id>/<document_id>/pages/0001.png
 """
+
+import logging
 from pathlib import Path
-from typing import Optional
 
 import config
+
+logger = logging.getLogger(__name__)
 
 
 class ObjectStorage:
     def upload(self, key: str, path: Path, content_type: str) -> None: ...
-    def download(self, key: str) -> Optional[bytes]: ...
+    def download(self, key: str) -> bytes | None: ...
     def remove(self, keys: list[str]) -> None: ...
 
 
@@ -31,13 +34,16 @@ class SupabaseStorage(ObjectStorage):
     def upload(self, key, path, content_type):
         with open(path, "rb") as f:  # streamed, not loaded into memory
             self._bucket().upload(
-                path=key, file=f,
-                file_options={"content-type": content_type, "upsert": "false"})
+                path=key,
+                file=f,
+                file_options={"content-type": content_type, "upsert": "false"},
+            )
 
     def download(self, key):
         try:
             return self._bucket().download(key)
         except Exception:
+            logger.exception("storage download failed for %s", key)
             return None
 
     def remove(self, keys):

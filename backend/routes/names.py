@@ -24,9 +24,7 @@ def create_name(payload: NameCreate) -> NameOut:
     try:
         get_supabase().table("names").insert({"name": name}).execute()
     except Exception as exc:
-        raise HTTPException(
-            status_code=502, detail=f"Failed to store name: {exc}"
-        ) from exc
+        raise HTTPException(status_code=502, detail=f"Failed to store name: {exc}") from exc
 
     return NameOut(name=name)
 
@@ -37,9 +35,7 @@ def list_names() -> list[NameOut]:
     try:
         result = get_supabase().table("names").select("name").execute()
     except Exception as exc:
-        raise HTTPException(
-            status_code=502, detail=f"Failed to load names: {exc}"
-        ) from exc
+        raise HTTPException(status_code=502, detail=f"Failed to load names: {exc}") from exc
 
     rows = result.data or []
     return [NameOut(name=row["name"]) for row in rows]

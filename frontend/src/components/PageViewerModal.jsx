@@ -1,6 +1,6 @@
-import { X } from 'lucide-react'
-import { useEffect } from 'react'
-import { pageImageUrl } from '../api/map.js'
+import { X } from "lucide-react";
+import { useEffect } from "react";
+import { pageImageUrl } from "../api/map.js";
 
 /**
  * Shows the original manuscript page a mention came from (the "evidence").
@@ -12,13 +12,13 @@ import { pageImageUrl } from '../api/map.js'
 export function PageViewerModal({ mention, onClose }) {
   // Close with the Escape key.
   useEffect(() => {
-    if (!mention) return undefined
-    const onKey = (e) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [mention, onClose])
+    if (!mention) return undefined;
+    const onKey = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mention, onClose]);
 
-  if (!mention) return null
+  if (!mention) return null;
 
   return (
     <div
@@ -35,14 +35,22 @@ export function PageViewerModal({ mention, onClose }) {
         <div className="flex items-start justify-between gap-4 border-b border-[#edf0ed] px-5 py-4">
           <div>
             <p className="font-medium">
-              {mention.document_name} <span className="text-[#7e8b85]">· page {mention.page_number}</span>
+              {mention.document_name}{" "}
+              <span className="text-[#7e8b85]">
+                · page {mention.page_number}
+              </span>
             </p>
             <p className="text-sm text-[#6e7975]">
               Mentions <strong>{mention.place_name}</strong>
               {mention.snippet ? <> — “{mention.snippet}”</> : null}
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 hover:bg-[#edf1ed]">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded p-1 hover:bg-[#edf1ed]"
+          >
             <X className="size-5" />
           </button>
         </div>
@@ -56,5 +64,5 @@ export function PageViewerModal({ mention, onClose }) {
         </div>
       </div>
     </div>
-  )
+  );
 }

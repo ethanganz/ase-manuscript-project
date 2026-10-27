@@ -1,28 +1,40 @@
 import { ArrowUpRight, MoreHorizontal, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { CollectionPreview } from '../tools/helpers.jsx'
+import { ArrowUpRight, Lock, MoreHorizontal, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CollectionPreview } from "../tools/helpers.jsx";
 
-const COLLECTIONS_PER_PAGE = 6
+const COLLECTIONS_PER_PAGE = 6;
 
 function CollectionCard({ collection }) {
   return (
     <article className="group relative rounded-xl border border-[#e0e6e0] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#c3d2c7] hover:shadow-[0_12px_30px_rgba(35,55,45,0.07)]">
-      <CollectionPreview collectionId={collection.id} className="mb-5 h-32 w-full rounded-lg" />
+      <CollectionPreview
+        collectionId={collection.id}
+        className="mb-5 h-32 w-full rounded-lg"
+      />
 
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-serif text-[19px] leading-tight">
             {/* The ::after makes the whole card clickable. */}
-            <a href={`#collection/${collection.id}`} className="after:absolute after:inset-0 after:rounded-xl">
+            <a
+              href={`#collection/${collection.id}`}
+              className="after:absolute after:inset-0 after:rounded-xl"
+            >
               {collection.name}
             </a>
           </h3>
           <p className="mt-1 text-xs text-[#8a9790]">
-            {collection.description || 'No description'}
+            {collection.description || "No description"}
           </p>
         </div>
 
-        <button className="relative z-10 text-[#99a39e] opacity-0 transition group-hover:opacity-100" aria-label={`More options for ${collection.name}`}>
+        <button
+          className="relative z-10 text-[#99a39e] opacity-0 transition group-hover:opacity-100"
+          aria-label={`More options for ${collection.name}`}
+        >
           <MoreHorizontal />
         </button>
       </div>
@@ -32,7 +44,7 @@ function CollectionCard({ collection }) {
         <ArrowUpRight className="size-4 text-[#6f8e7b]" />
       </div>
     </article>
-  )
+  );
 }
 
 function CollectionSkeletonCard() {
@@ -45,11 +57,16 @@ function CollectionSkeletonCard() {
       <div className="mt-6 h-px bg-[#edf1ee]" />
       <div className="mt-4 h-3 w-1/3 rounded bg-[#edf1ee]" />
     </div>
-  )
+  );
 }
 
-export function CollectionSection({ collections, search, onSearchChange, isLoading }) {
-  const [page, setPage] = useState(1)
+export function CollectionSection({
+  collections,
+  search,
+  onSearchChange,
+  isLoading,
+}) {
+  const [page, setPage] = useState(1);
 
   const filteredCollections = useMemo(
     () =>
@@ -60,25 +77,37 @@ export function CollectionSection({ collections, search, onSearchChange, isLoadi
           collection.name.toLowerCase().includes(search.toLowerCase()),
       ),
     [collections, search],
-  )
+  );
 
-  const totalPages = Math.max(1, Math.ceil(filteredCollections.length / COLLECTIONS_PER_PAGE))
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredCollections.length / COLLECTIONS_PER_PAGE),
+  );
 
   useEffect(() => {
-    setPage(1)
-  }, [search, filteredCollections.length])
+    setPage(1);
+  }, [search, filteredCollections.length]);
 
-  const currentPage = Math.min(page, totalPages)
-  const startIndex = (currentPage - 1) * COLLECTIONS_PER_PAGE
-  const visibleCollections = filteredCollections.slice(startIndex, startIndex + COLLECTIONS_PER_PAGE)
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * COLLECTIONS_PER_PAGE;
+  const visibleCollections = filteredCollections.slice(
+    startIndex,
+    startIndex + COLLECTIONS_PER_PAGE,
+  );
 
   return (
     <section id="collections" className="py-12">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#8b9c91]">The archive</p>
-          <h2 className="font-serif text-3xl tracking-[-0.04em]">Collections</h2>
-          <p className="mt-2 text-sm text-[#7e8b85]">Historical materials you are currently exploring.</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#8b9c91]">
+            The archive
+          </p>
+          <h2 className="font-serif text-3xl tracking-[-0.04em]">
+            Collections
+          </h2>
+          <p className="mt-2 text-sm text-[#7e8b85]">
+            Historical materials you are currently exploring.
+          </p>
         </div>
 
         <label className="flex h-10 w-full items-center gap-2 rounded-lg border border-[#dfe5df] bg-white px-3 text-sm text-[#89958f] sm:w-64">
@@ -129,7 +158,9 @@ export function CollectionSection({ collections, search, onSearchChange, isLoadi
 
               <button
                 type="button"
-                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                onClick={() =>
+                  setPage((current) => Math.min(totalPages, current + 1))
+                }
                 disabled={currentPage === totalPages}
                 className="rounded-md border border-[#dfe5df] px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -140,5 +171,5 @@ export function CollectionSection({ collections, search, onSearchChange, isLoadi
         </>
       )}
     </section>
-  )
+  );
 }

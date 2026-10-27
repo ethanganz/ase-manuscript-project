@@ -1,5 +1,4 @@
 import mimetypes
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -12,8 +11,7 @@ from services.storage import ObjectStorage
 router = APIRouter(prefix="/api", tags=["documents"])
 
 
-def _require_visible_document(repo: Repository, document_id: UUID,
-                              user: Optional[dict]) -> dict:
+def _require_visible_document(repo: Repository, document_id: UUID, user: dict | None) -> dict:
     """The document, or 404 if it is missing or in someone else's private collection."""
     doc = repo.get_document(str(document_id))
     if doc is None:
@@ -23,14 +21,20 @@ def _require_visible_document(repo: Repository, document_id: UUID,
 
 
 @router.get("/documents/{document_id}", response_model=DocumentOut)
-def get_document(document_id: UUID, repo: Repository = Depends(get_repo),
-                 user: Optional[dict] = Depends(get_optional_user)):
+def get_document(
+    document_id: UUID,
+    repo: Repository = Depends(get_repo),
+    user: dict | None = Depends(get_optional_user),
+):
     return _require_visible_document(repo, document_id, user)
 
 
 @router.get("/documents/{document_id}/pages", response_model=list[PageOut])
-def list_pages(document_id: UUID, repo: Repository = Depends(get_repo),
-               user: Optional[dict] = Depends(get_optional_user)):
+def list_pages(
+    document_id: UUID,
+    repo: Repository = Depends(get_repo),
+    user: dict | None = Depends(get_optional_user),
+):
     _require_visible_document(repo, document_id, user)
     return repo.list_pages(str(document_id))
 
@@ -40,7 +44,7 @@ def get_page_image(
     page_id: UUID,
     repo: Repository = Depends(get_repo),
     storage: ObjectStorage = Depends(get_storage),
-    user: Optional[dict] = Depends(get_optional_user),
+    user: dict | None = Depends(get_optional_user),
 ):
     page = repo.get_page(str(page_id))
     if page is None:

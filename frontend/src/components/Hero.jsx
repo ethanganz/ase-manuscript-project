@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react'
+import { Plus } from "lucide-react";
 
 export function Hero({ onCreateCollection }) {
   return (
@@ -11,7 +11,8 @@ export function Hero({ onCreateCollection }) {
           Explore the archive.
         </h1>
         <p className="mt-5 max-w-xl text-[15px] leading-7 text-[#71807a]">
-          Discover handwritten histories, places, and stories preserved across remarkable collections.
+          Discover handwritten histories, places, and stories preserved across
+          remarkable collections.
         </p>
       </div>
 
@@ -24,5 +25,5 @@ export function Hero({ onCreateCollection }) {
         New collection
       </button>
     </section>
-  )
+  );
 }

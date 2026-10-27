@@ -49,9 +49,7 @@ MAX_FILE_BYTES = int(os.getenv("MAX_FILE_MB", "40")) * MB
 MAX_ZIP_ENTRIES = int(os.getenv("MAX_ZIP_ENTRIES", "500"))
 
 # Maximum total uncompressed ZIP size: 1 GB
-MAX_ZIP_UNCOMPRESSED_BYTES = int(
-    os.getenv("MAX_ZIP_UNCOMPRESSED_MB", "1000")
-) * MB
+MAX_ZIP_UNCOMPRESSED_BYTES = int(os.getenv("MAX_ZIP_UNCOMPRESSED_MB", "1000")) * MB
 
 # Maximum PDF pages: 500
 MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", "500"))

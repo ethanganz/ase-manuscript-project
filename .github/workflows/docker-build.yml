@@ -73,3 +73,10 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/ase-manuscript-project-frontend:latest
             ghcr.io/${{ github.repository_owner }}/ase-manuscript-project-frontend:${{ steps.frontend_version.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/ase-manuscript-project-frontend:${{ github.sha }}
+
+      - name: Trigger n8n deploy webhook
+        if: success()
+        run: |
+          curl -X POST "${{ secrets.N8N_DEPLOY_WEBHOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{"ref":"main","sha":"${{ github.sha }}","repository":"${{ github.repository }}","workflow_run":"${{ github.run_id }}"}'

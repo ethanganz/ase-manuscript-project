@@ -44,9 +44,13 @@ def test_upload_pdf_is_split_into_pages(client, collection):
 
 
 def test_bulk_upload_multiple_files(client, collection):
-    r = upload(client, collection["id"],
-               ("a.png", make_image()), ("b.jpg", make_image("JPEG")),
-               ("c.pdf", make_pdf(2)))
+    r = upload(
+        client,
+        collection["id"],
+        ("a.png", make_image()),
+        ("b.jpg", make_image("JPEG")),
+        ("c.pdf", make_pdf(2)),
+    )
     assert r.status_code == 201
     assert r.json()["accepted"] == 3
     docs = client.get(f"/api/collections/{collection['id']}/documents").json()
@@ -54,19 +58,21 @@ def test_bulk_upload_multiple_files(client, collection):
 
 
 def test_zip_of_images(client, collection):
-    z = make_zip({
-        "letters/p1.png": make_image(),
-        "letters/p2.jpg": make_image("JPEG"),
-        "letters/notes.txt": b"hello",
-        "__MACOSX/letters/._p1.png": b"junk",
-        "letters/.DS_Store": b"junk",
-    })
+    z = make_zip(
+        {
+            "letters/p1.png": make_image(),
+            "letters/p2.jpg": make_image("JPEG"),
+            "letters/notes.txt": b"hello",
+            "__MACOSX/letters/._p1.png": b"junk",
+            "letters/.DS_Store": b"junk",
+        }
+    )
     r = upload(client, collection["id"], ("batch.zip", z))
     body = r.json()
     assert r.status_code == 201
     assert body["accepted"] == 2
-    assert body["rejected"] == 1                     # notes.txt only; junk ignored
-    rejected = [x for x in body["results"] if x["status"] == "rejected"][0]
+    assert body["rejected"] == 1  # notes.txt only; junk ignored
+    rejected = next(x for x in body["results"] if x["status"] == "rejected")
     assert "notes.txt" in rejected["filename"]
 
     docs = client.get(f"/api/collections/{collection['id']}/documents").json()
@@ -141,9 +147,8 @@ def test_corrupt_zip_rejected(client, collection):
 
 
 def test_mixed_batch_reports_each_file(client, collection):
-    r = upload(client, collection["id"],
-               ("good.png", make_image()), ("bad.txt", b"nope"))
-    assert r.status_code == 201                      # at least one accepted
+    r = upload(client, collection["id"], ("good.png", make_image()), ("bad.txt", b"nope"))
+    assert r.status_code == 201  # at least one accepted
     statuses = {x["filename"]: x["status"] for x in r.json()["results"]}
     assert statuses == {"good.png": "accepted", "bad.txt": "rejected"}
 
@@ -156,9 +161,11 @@ def test_zip_slip_names_never_reach_storage_keys(client, collection, storage):
     for key in storage.objects:
         assert ".." not in key and "evil" not in key
         assert key.startswith(f"collections/{collection['id']}/")
-    names = {d["original_filename"] for d in
-             client.get(f"/api/collections/{collection['id']}/documents").json()}
-    assert names == {"evil.png", "evil2.png"}        # path parts stripped
+    names = {
+        d["original_filename"]
+        for d in client.get(f"/api/collections/{collection['id']}/documents").json()
+    }
+    assert names == {"evil.png", "evil2.png"}  # path parts stripped
 
 
 def test_malicious_filename_is_sanitised(client, collection):
@@ -169,8 +176,7 @@ def test_malicious_filename_is_sanitised(client, collection):
 
 # ------------------------------------------------------------------- plumbing
 def test_upload_to_unknown_collection_404(client):
-    r = upload(client, "00000000-0000-0000-0000-000000000000",
-               ("a.png", make_image()))
+    r = upload(client, "00000000-0000-0000-0000-000000000000", ("a.png", make_image()))
     assert r.status_code == 404
 
 
@@ -183,7 +189,10 @@ def test_objects_stored_under_collection_and_document(client, collection, storag
     doc = client.get(f"/api/collections/{collection['id']}/documents").json()[0]
     base = f"collections/{collection['id']}/documents/{doc['id']}"
     assert set(storage.objects) == {
-        f"{base}/original.pdf", f"{base}/pages/0001.png", f"{base}/pages/0002.png"}
+        f"{base}/original.pdf",
+        f"{base}/pages/0001.png",
+        f"{base}/pages/0002.png",
+    }
     assert storage.objects[f"{base}/original.pdf"][1] == "application/pdf"
 
 
@@ -218,6 +227,7 @@ def test_corrupt_heic_rejected(client, collection, storage):
 def test_db_failure_removes_uploaded_objects(client, collection, repo, storage, monkeypatch):
     def boom(pages):
         raise RuntimeError("db down")
+
     monkeypatch.setattr(repo, "create_pages", boom)
     r = upload(client, collection["id"], ("a.pdf", make_pdf(2)))
     assert r.status_code == 422

@@ -17,8 +17,8 @@ def _start_session(response: Response, user: dict) -> None:
         config.AUTH_COOKIE_NAME,
         create_token(str(user["id"])),
         max_age=config.JWT_EXPIRE_MINUTES * 60,
-        httponly=True,       # JavaScript cannot read it
-        samesite="lax",      # not sent with POSTs from other sites
+        httponly=True,  # JavaScript cannot read it
+        samesite="lax",  # not sent with POSTs from other sites
         secure=config.AUTH_COOKIE_SECURE,
         path="/",
     )
@@ -48,8 +48,7 @@ def register(payload: UserCreate, tasks: BackgroundTasks,
 def login(payload: UserLogin, response: Response, repo: Repository = Depends(get_repo)):
     """Check email and password and log in."""
     user = repo.get_user_by_email(payload.email)
-    password_ok = verify_password(
-        payload.password, user["password_hash"] if user else DUMMY_HASH)
+    password_ok = verify_password(payload.password, user["password_hash"] if user else DUMMY_HASH)
     if user is None or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     # Only said after a correct password, so it does not reveal which emails exist.
@@ -94,8 +93,12 @@ def logout():
     """Log out by removing the token cookie."""
     response = Response(status_code=204)
     response.delete_cookie(
-        config.AUTH_COOKIE_NAME, path="/", httponly=True, samesite="lax",
-        secure=config.AUTH_COOKIE_SECURE)
+        config.AUTH_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=config.AUTH_COOKIE_SECURE,
+    )
     return response
 
 

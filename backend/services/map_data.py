@@ -5,6 +5,7 @@ One row = one time a place was found on one page. Example row:
    "snippet": "...arrived in Geneva on...", "page_id": "...", "page_number": 3,
    "document_id": "...", "document_name": "letter_001.pdf", "collection_id": "..."}
 """
+
 from collections import defaultdict
 
 

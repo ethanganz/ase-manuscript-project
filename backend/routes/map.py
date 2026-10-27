@@ -1,5 +1,4 @@
 import re
-from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,18 +12,26 @@ router = APIRouter(prefix="/api/collections", tags=["map"])
 
 
 @router.get("/{collection_id}/map/countries", response_model=list[CountrySummary])
-def countries(collection_id: UUID, repo: Repository = Depends(get_repo),
-              user: Optional[dict] = Depends(get_optional_user)):
+def countries(
+    collection_id: UUID,
+    repo: Repository = Depends(get_repo),
+    user: dict | None = Depends(get_optional_user),
+):
     """Countries that have at least one place mentioned in this collection."""
     require_visible_collection(repo, str(collection_id), user)
     return summarize_countries(repo.list_mention_details(str(collection_id)))
 
 
-@router.get("/{collection_id}/map/countries/{country_code}/mentions",
-            response_model=list[MentionOut])
-def country_mentions(collection_id: UUID, country_code: str,
-                     repo: Repository = Depends(get_repo),
-                     user: Optional[dict] = Depends(get_optional_user)):
+@router.get(
+    "/{collection_id}/map/countries/{country_code}/mentions",
+    response_model=list[MentionOut],
+)
+def country_mentions(
+    collection_id: UUID,
+    country_code: str,
+    repo: Repository = Depends(get_repo),
+    user: dict | None = Depends(get_optional_user),
+):
     """Every mention in one country, each with the page it came from."""
     if not re.fullmatch(r"[A-Za-z]{2}", country_code):
         raise HTTPException(status_code=422, detail="country_code must be 2 letters, e.g. CH")

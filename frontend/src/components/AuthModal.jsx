@@ -1,9 +1,12 @@
 import { MailCheck, X } from 'lucide-react'
 import { useState } from 'react'
 import { login, register, resendVerification } from '../api/auth.js'
+import { X } from "lucide-react";
+import { useState } from "react";
+import { login, register } from "../api/auth.js";
 
 const inputClass =
-  'mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]'
+  "mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
 
 /** Sends a new verification email to `email` and shows when it is on its way. */
 function ResendButton({ email }) {
@@ -57,7 +60,7 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
   const [unverifiedEmail, setUnverifiedEmail] = useState('')
   const [justRegistered, setJustRegistered] = useState(false)
 
-  const isRegister = mode === 'register'
+  const isRegister = mode === "register";
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -77,7 +80,7 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
       setError(err.message)
       if (err.status === 403) setUnverifiedEmail(email.trim())
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 
@@ -100,7 +103,7 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
     setMode('login')
   }
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -230,5 +233,5 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
         )}
       </div>
     </div>
-  )
+  );
 }

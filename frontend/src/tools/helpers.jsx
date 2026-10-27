@@ -1,7 +1,7 @@
-import { FileText, FolderOpen } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { getDocuments, getPages } from '../api/documents.js'
-import { pageImageUrl } from '../api/map.js'
+import { FileText, FolderOpen } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getDocuments, getPages } from "../api/documents.js";
+import { pageImageUrl } from "../api/map.js";
 
 /**
  * Thumbnail of the first page of a collection's documents.
@@ -31,17 +31,17 @@ export function CollectionPreview({ documents, collectionId, className = 'h-20 w
   }
 
   useEffect(() => {
-    if (documents || !collectionId) return
-    let cancelled = false
+    if (documents || !collectionId) return;
+    let cancelled = false;
 
     getDocuments(collectionId)
       .then((loaded) => !cancelled && setFetchedDocuments(loaded))
-      .catch(() => !cancelled && setFailed(true))
+      .catch(() => !cancelled && setFailed(true));
 
     return () => {
-      cancelled = true
-    }
-  }, [documents, collectionId])
+      cancelled = true;
+    };
+  }, [documents, collectionId]);
 
   useEffect(() => {
     if (!currentDocumentId) return
@@ -60,14 +60,14 @@ export function CollectionPreview({ documents, collectionId, className = 'h-20 w
     }
   }, [currentDocumentId])
 
-  const frame = `flex items-center justify-center overflow-hidden border border-[#e0e6e0] bg-[#eef3ef] ${className}`
+  const frame = `flex items-center justify-center overflow-hidden border border-[#e0e6e0] bg-[#eef3ef] ${className}`;
 
   if (allDocuments && !firstDocument) {
     return (
       <div className={frame} title="No files yet">
         <FolderOpen className="size-5 text-[#a3b3a9]" />
       </div>
-    )
+    );
   }
 
   if (failed || outOfDocuments) {
@@ -75,11 +75,11 @@ export function CollectionPreview({ documents, collectionId, className = 'h-20 w
       <div className={frame} title={firstDocument?.original_filename}>
         <FileText className="size-5 text-[#a3b3a9]" />
       </div>
-    )
+    );
   }
 
   if (!pageId) {
-    return <div className={`${frame} animate-pulse`} />
+    return <div className={`${frame} animate-pulse`} />;
   }
 
   return (
@@ -92,24 +92,28 @@ export function CollectionPreview({ documents, collectionId, className = 'h-20 w
         className="size-full object-cover object-top"
       />
     </div>
-  )
+  );
 }
 
 export function formatDate(value) {
-  if (!value) return '—'
-  return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 export function formatBytes(bytes) {
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB']
-  let size = bytes / 1024
-  let unit = 0
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let size = bytes / 1024;
+  let unit = 0;
   while (size >= 1024 && unit < units.length - 1) {
-    size /= 1024
-    unit += 1
+    size /= 1024;
+    unit += 1;
   }
-  return `${size.toFixed(1)} ${units[unit]}`
+  return `${size.toFixed(1)} ${units[unit]}`;
 }
 
 export function StatCard({ icon: Icon, label, value }) {
@@ -119,7 +123,9 @@ export function StatCard({ icon: Icon, label, value }) {
         <Icon className="size-4" />
         {label}
       </div>
-      <p className="mt-3 font-serif text-3xl tracking-[-0.03em] text-[#1e302b]">{value}</p>
+      <p className="mt-3 font-serif text-3xl tracking-[-0.03em] text-[#1e302b]">
+        {value}
+      </p>
     </div>
-  )
+  );
 }

@@ -7,13 +7,15 @@ Rules:
   * Work happens in a temporary folder that is always deleted afterwards.
   * A file either fully succeeds (objects + DB rows) or leaves nothing behind.
 """
+
 import hashlib
+import logging
 import re
 import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import BinaryIO, Optional
+from typing import BinaryIO
 from uuid import uuid4
 
 import pymupdf
@@ -23,17 +25,30 @@ from pillow_heif import register_heif_opener
 import config
 from database.repository import Repository
 from services.storage import ObjectStorage
-import logging
 
 logger = logging.getLogger("uvicorn.error")
 
 register_heif_opener()  # lets Pillow open .heic files
 
 EXT = {"pdf": "pdf", "jpeg": "jpg", "png": "png", "heic": "heic"}
-CONTENT_TYPE = {"pdf": "application/pdf", "jpeg": "image/jpeg",
-                "png": "image/png", "heic": "image/heic"}
+CONTENT_TYPE = {
+    "pdf": "application/pdf",
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "heic": "image/heic",
+}
 PAGE_CONTENT_TYPE = {"png": "image/png", "jpg": "image/jpeg"}
-HEIC_BRANDS = {b"heic", b"heix", b"hevc", b"hevx", b"heim", b"heis", b"mif1", b"msf1", b"heif"}
+HEIC_BRANDS = {
+    b"heic",
+    b"heix",
+    b"hevc",
+    b"hevx",
+    b"heim",
+    b"heis",
+    b"mif1",
+    b"msf1",
+    b"heif",
+}
 
 
 class IngestError(Exception):
@@ -44,16 +59,16 @@ class IngestError(Exception):
 class FileOutcome:
     filename: str
     accepted: bool
-    document_id: Optional[str] = None
-    page_count: Optional[int] = None
-    error: Optional[str] = None
+    document_id: str | None = None
+    page_count: int | None = None
+    error: str | None = None
 
 
 @dataclass
 class _Page:
     number: int
-    path: Path      # local temp file
-    ext: str        # "png" or "jpg" (what gets stored as the page image)
+    path: Path  # local temp file
+    ext: str  # "png" or "jpg" (what gets stored as the page image)
     width: int
     height: int
 
@@ -61,7 +76,7 @@ class _Page:
 # --------------------------------------------------------------------------
 # Helpers
 # --------------------------------------------------------------------------
-def sniff_type(path: Path) -> Optional[str]:
+def sniff_type(path: Path) -> str | None:
     """Return 'pdf' | 'jpeg' | 'png' | 'heic' | 'zip' from file content, else None."""
     with open(path, "rb") as f:
         head = f.read(12)
@@ -91,8 +106,7 @@ def save_stream_with_limit(src: BinaryIO, dest: Path, limit: int) -> None:
         while chunk := src.read(1024 * 1024):
             total += len(chunk)
             if total > limit:
-                raise IngestError(
-                    f"File is larger than the {limit // config.MB} MB limit")
+                raise IngestError(f"File is larger than the {limit // config.MB} MB limit")
             out.write(chunk)
 
 
@@ -139,8 +153,7 @@ def _pdf_pages(src: Path, pages_dir: Path) -> list[_Page]:
         if pdf.page_count == 0:
             raise IngestError("PDF has no pages")
         if pdf.page_count > config.MAX_PDF_PAGES:
-            raise IngestError(
-                f"PDF has {pdf.page_count} pages (limit {config.MAX_PDF_PAGES})")
+            raise IngestError(f"PDF has {pdf.page_count} pages (limit {config.MAX_PDF_PAGES})")
         zoom = config.PDF_RENDER_DPI / 72
         matrix = pymupdf.Matrix(zoom, zoom)
         pages: list[_Page] = []
@@ -158,20 +171,27 @@ def _pdf_pages(src: Path, pages_dir: Path) -> list[_Page]:
 # --------------------------------------------------------------------------
 # One file -> one document
 # --------------------------------------------------------------------------
-def _ingest_single(repo: Repository, storage: ObjectStorage, collection_id: str,
-                   filename: str, src: Path, kind: str,
-                   source_archive: Optional[str] = None) -> FileOutcome:
-    document_id = str(uuid4())   
+def _ingest_single(
+    repo: Repository,
+    storage: ObjectStorage,
+    collection_id: str,
+    filename: str,
+    src: Path,
+    kind: str,
+    source_archive: str | None = None,
+) -> FileOutcome:
+    document_id = str(uuid4())
     prefix = f"collections/{collection_id}/documents/{document_id}"
-    uploaded: list[str] = []      # storage keys, so we can undo on failure
+    uploaded: list[str] = []  # storage keys, so we can undo on failure
     doc_created = False
 
     with tempfile.TemporaryDirectory() as work:
         pages_dir = Path(work) / "pages"
         pages_dir.mkdir()
         try:
-            pages = _pdf_pages(src, pages_dir) if kind == "pdf" \
-                else _image_page(src, pages_dir, kind)
+            pages = (
+                _pdf_pages(src, pages_dir) if kind == "pdf" else _image_page(src, pages_dir, kind)
+            )
 
             original_key = f"{prefix}/original.{EXT[kind]}"
             storage.upload(original_key, src, CONTENT_TYPE[kind])
@@ -182,27 +202,31 @@ def _ingest_single(repo: Repository, storage: ObjectStorage, collection_id: str,
                 key = f"{prefix}/pages/{p.number:04d}.{p.ext}"
                 storage.upload(key, p.path, PAGE_CONTENT_TYPE[p.ext])
                 uploaded.append(key)
-                page_rows.append({
-                    "id": str(uuid4()),
-                    "document_id": document_id,
-                    "page_number": p.number,
-                    "image_path": key,
-                    "width": p.width,
-                    "height": p.height,
-                    "status": "pending",   # picked up by the image-processing stage later
-                })
+                page_rows.append(
+                    {
+                        "id": str(uuid4()),
+                        "document_id": document_id,
+                        "page_number": p.number,
+                        "image_path": key,
+                        "width": p.width,
+                        "height": p.height,
+                        "status": "pending",  # picked up by the image-processing stage later
+                    }
+                )
 
-            repo.create_document({
-                "id": document_id,
-                "collection_id": collection_id,
-                "original_filename": safe_filename(filename),
-                "source_archive": safe_filename(source_archive) if source_archive else None,
-                "file_type": kind,
-                "size_bytes": src.stat().st_size,
-                "sha256": _sha256(src),
-                "status": "uploaded",
-                "original_path": original_key,
-            })
+            repo.create_document(
+                {
+                    "id": document_id,
+                    "collection_id": collection_id,
+                    "original_filename": safe_filename(filename),
+                    "source_archive": safe_filename(source_archive) if source_archive else None,
+                    "file_type": kind,
+                    "size_bytes": src.stat().st_size,
+                    "sha256": _sha256(src),
+                    "status": "uploaded",
+                    "original_path": original_key,
+                }
+            )
             doc_created = True
             repo.create_pages(page_rows)
             return FileOutcome(filename, True, document_id, len(pages))
@@ -215,17 +239,22 @@ def _ingest_single(repo: Repository, storage: ObjectStorage, collection_id: str,
             raise IngestError("Unexpected error while processing the file") from exc
 
 
-def _rollback(repo: Repository, storage: ObjectStorage, uploaded: list[str],
-              document_id: str, doc_created: bool) -> None:
+def _rollback(
+    repo: Repository,
+    storage: ObjectStorage,
+    uploaded: list[str],
+    document_id: str,
+    doc_created: bool,
+) -> None:
     try:
         storage.remove(uploaded)
     except Exception:
-        pass
+        logger.exception("rollback: failed to remove uploaded files")
     if doc_created:
         try:
             repo.delete_document(document_id)
         except Exception:
-            pass
+            logger.exception("rollback: failed to delete document")
 
 
 # --------------------------------------------------------------------------
@@ -233,12 +262,21 @@ def _rollback(repo: Repository, storage: ObjectStorage, uploaded: list[str],
 # --------------------------------------------------------------------------
 def _is_junk(name: str) -> bool:
     parts = PurePosixPath(name.replace("\\", "/")).parts
-    return (not parts or parts[0] == "__MACOSX"
-            or parts[-1].startswith(".") or parts[-1].lower() == "thumbs.db")
+    return (
+        not parts
+        or parts[0] == "__MACOSX"
+        or parts[-1].startswith(".")
+        or parts[-1].lower() == "thumbs.db"
+    )
 
 
-def _ingest_zip(repo: Repository, storage: ObjectStorage, collection_id: str,
-                filename: str, src: Path) -> list[FileOutcome]:
+def _ingest_zip(
+    repo: Repository,
+    storage: ObjectStorage,
+    collection_id: str,
+    filename: str,
+    src: Path,
+) -> list[FileOutcome]:
     try:
         zf = zipfile.ZipFile(src)
     except zipfile.BadZipFile:
@@ -246,15 +284,20 @@ def _ingest_zip(repo: Repository, storage: ObjectStorage, collection_id: str,
 
     outcomes: list[FileOutcome] = []
     with zf:
-        infos = sorted((i for i in zf.infolist()
-                        if not i.is_dir() and not _is_junk(i.filename)),
-                       key=lambda i: i.filename)
+        infos = sorted(
+            (i for i in zf.infolist() if not i.is_dir() and not _is_junk(i.filename)),
+            key=lambda i: i.filename,
+        )
         if not infos:
             return [FileOutcome(filename, False, error="ZIP contains no files")]
         if len(infos) > config.MAX_ZIP_ENTRIES:
-            return [FileOutcome(
-                filename, False,
-                error=f"ZIP has {len(infos)} files (limit {config.MAX_ZIP_ENTRIES})")]
+            return [
+                FileOutcome(
+                    filename,
+                    False,
+                    error=f"ZIP has {len(infos)} files (limit {config.MAX_ZIP_ENTRIES})",
+                )
+            ]
         if sum(i.file_size for i in infos) > config.MAX_ZIP_UNCOMPRESSED_BYTES:
             return [FileOutcome(filename, False, error="ZIP is too large when unpacked")]
 
@@ -267,19 +310,22 @@ def _ingest_zip(repo: Repository, storage: ObjectStorage, collection_id: str,
                     if info.flag_bits & 0x1:
                         raise IngestError("Encrypted ZIP entries are not supported")
                     with zf.open(info) as fh:
-                        save_stream_with_limit(
-                            fh, member, min(config.MAX_FILE_BYTES, budget))
+                        save_stream_with_limit(fh, member, min(config.MAX_FILE_BYTES, budget))
                     budget -= member.stat().st_size
                     kind = sniff_type(member)
                     if kind == "zip":
                         raise IngestError("Nested ZIP files are not supported")
                     if kind is None:
-                        raise IngestError(
-                            "Unsupported file type (need PDF, JPG, PNG or HEIC)")
+                        raise IngestError("Unsupported file type (need PDF, JPG, PNG or HEIC)")
                     out = _ingest_single(
-                        repo, storage, collection_id,
-                        PurePosixPath(info.filename).name, member, kind,
-                        source_archive=filename)
+                        repo,
+                        storage,
+                        collection_id,
+                        PurePosixPath(info.filename).name,
+                        member,
+                        kind,
+                        source_archive=filename,
+                    )
                     out.filename = label
                     outcomes.append(out)
                 except IngestError as exc:
@@ -292,8 +338,13 @@ def _ingest_zip(repo: Repository, storage: ObjectStorage, collection_id: str,
 # --------------------------------------------------------------------------
 # Public entry point
 # --------------------------------------------------------------------------
-def ingest_upload(repo: Repository, storage: ObjectStorage, collection_id: str,
-                  filename: str, stream: BinaryIO) -> list[FileOutcome]:
+def ingest_upload(
+    repo: Repository,
+    storage: ObjectStorage,
+    collection_id: str,
+    filename: str,
+    stream: BinaryIO,
+) -> list[FileOutcome]:
     """Process one uploaded file. Returns one outcome per resulting document
     (a ZIP yields one outcome per file inside it)."""
     filename = safe_filename(filename)
@@ -308,9 +359,13 @@ def ingest_upload(repo: Repository, storage: ObjectStorage, collection_id: str,
 
         kind = sniff_type(src)
         if kind is None:
-            return [FileOutcome(
-                filename, False,
-                error="Unsupported file type (need PDF, JPG, PNG, HEIC or ZIP)")]
+            return [
+                FileOutcome(
+                    filename,
+                    False,
+                    error="Unsupported file type (need PDF, JPG, PNG, HEIC or ZIP)",
+                )
+            ]
         if kind == "zip":
             return _ingest_zip(repo, storage, collection_id, filename, src)
         try:
