@@ -31,8 +31,9 @@ export function CreateCollectionModal({
 
   useEffect(() => {
     if (!submitting) {
-      setStageIndex(0);
-      setProgress(0);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStageIndex(() => 0);
+      setProgress(() => 0);
       return;
     }
 

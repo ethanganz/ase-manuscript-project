@@ -85,7 +85,8 @@ export function CollectionSection({
   );
 
   useEffect(() => {
-    setPage(1);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPage(() => 1);
   }, [search, filteredCollections.length]);
 
   const currentPage = Math.min(page, totalPages);
