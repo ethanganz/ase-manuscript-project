@@ -1,7 +1,6 @@
 """Password hashing and login tokens."""
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
@@ -33,13 +32,16 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def create_token(user_id: str) -> str:
     """Return a signed token that identifies the user."""
-    now = datetime.now(timezone.utc)
-    payload = {"sub": user_id, "iat": now,
-               "exp": now + timedelta(minutes=config.JWT_EXPIRE_MINUTES)}
+    now = datetime.now(UTC)
+    payload = {
+        "sub": user_id,
+        "iat": now,
+        "exp": now + timedelta(minutes=config.JWT_EXPIRE_MINUTES),
+    }
     return jwt.encode(payload, config.JWT_SECRET, algorithm=ALGORITHM)
 
 
-def decode_token(token: str) -> Optional[str]:
+def decode_token(token: str) -> str | None:
     """Return the user ID in the token, or None if it is invalid or expired."""
     try:
         payload = jwt.decode(token, config.JWT_SECRET, algorithms=[ALGORITHM])

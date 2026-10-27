@@ -22,11 +22,12 @@ When a user uploads a manuscript and our model finds place words,
 our backend calls this file automatically, once for each word. 
 It is the next feature, together with saving into the database.
 """
+
 import json
 import sys
+import xml.etree.ElementTree as ET
 from collections import Counter
 from pathlib import Path
-import xml.etree.ElementTree as ET
 
 from services.candidates import Choice, choose_candidate
 from services.place_variants import normalize_word
@@ -46,7 +47,7 @@ def _text_of(place: ET.Element, tag: str) -> str:
 
 
 def _parse_geo(geo_text: str | None) -> tuple[float | None, float | None]:
-    """"47.36667 8.55" -> (47.36667, 8.55). Anything odd -> (None, None)."""
+    """ "47.36667 8.55" -> (47.36667, 8.55). Anything odd -> (None, None)."""
     parts = (geo_text or "").split()
     if len(parts) != 2:
         return None, None
@@ -54,7 +55,7 @@ def _parse_geo(geo_text: str | None) -> tuple[float | None, float | None]:
         lat, lng = float(parts[0]), float(parts[1])
     except ValueError:
         return None, None
-    if not (-90 <= lat <= 90 and -180 <= lng <= 180):    # impossible on a globe
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180):  # impossible on a globe
         return None, None
     return lat, lng
 
@@ -105,7 +106,7 @@ def locality_to_candidate(entry: dict) -> dict | None:
 
 class PlaceLookup:
     def __init__(self, variants: dict, localities: dict):
-        self._variants = variants        # normalized word -> {"ids": {id: count}, "forms": [...]}
+        self._variants = variants  # normalized word -> {"ids": {id: count}, "forms": [...]}
         self._localities = localities
 
     @classmethod
@@ -128,9 +129,12 @@ class PlaceLookup:
             entry = self._localities.get(place_id)
             candidate = locality_to_candidate(entry) if entry else None
             if candidate is None:
-                continue          # id not in our copy of the place list
+                continue  # id not in our copy of the place list
             # Evidence stays attached, so a later step can turn it into a confidence.
-            candidate["variant_evidence"] = {"times_tagged": times, "share": round(share, 2)}
+            candidate["variant_evidence"] = {
+                "times_tagged": times,
+                "share": round(share, 2),
+            }
             candidates.append(candidate)
         return candidates
 
@@ -145,8 +149,10 @@ def resolve_mention(mention: dict, lookup: PlaceLookup) -> Choice:
 
 def main(argv: list[str]) -> int:
     if len(argv) != 4:
-        print("Usage: python -m services.place_lookup <place_variants.json> "
-              "<localities.xml> <place_mentions.jsonl>")
+        print(
+            "Usage: python -m services.place_lookup <place_variants.json> "
+            "<localities.xml> <place_mentions.jsonl>"
+        )
         return 2
     lookup = PlaceLookup.from_files(Path(argv[1]), Path(argv[2]))
     counts: Counter = Counter()
@@ -156,8 +162,10 @@ def main(argv: list[str]) -> int:
         mention = json.loads(line)
         choice = resolve_mention(mention, lookup)
         counts[choice.status] += 1
-        print(f"{mention['observed_text']:<24} {choice.status:<14} "
-              f"{choice.name or '-':<14} {choice.country_code or '-'}")
+        print(
+            f"{mention['observed_text']:<24} {choice.status:<14} "
+            f"{choice.name or '-':<14} {choice.country_code or '-'}"
+        )
     print()
     print(dict(counts))
     return 0
@@ -165,7 +173,6 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
-
 
 
 # TEST

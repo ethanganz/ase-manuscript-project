@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routes import documents, names
-from routes import map as map_routes
 
 from routes import auth, collections, documents, names
+from routes import map as map_routes
 
 app = FastAPI(title="ASE Manuscript Project")
 

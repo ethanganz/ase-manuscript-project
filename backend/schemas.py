@@ -1,16 +1,16 @@
 import re
 from datetime import datetime
-from typing import Annotated, Literal, Optional
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 from services.auth import MAX_PASSWORD_BYTES
 
-'''
+"""
     This defines the shape of the data the API sends back, such as what a collection or a page looks like.
 
-'''
+"""
 
 
 EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
@@ -56,32 +56,32 @@ class UserLogin(BaseModel):
 class UserOut(BaseModel):
     id: UUID
     email: str
-    first_name: Optional[str] = None   # "First Last"
-    last_name: Optional[str] = None   # "First Last"
-    created_at: Optional[datetime] = None
+    first_name: str | None = None  # "First Last"
+    last_name: str | None = None  # "First Last"
+    created_at: datetime | None = None
 
 
 # Request model for creating a new collection.
 class CollectionCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    description: Optional[str] = Field(default=None, max_length=2000)
-    is_public: bool = True   # False = only the owner can see it
+    description: str | None = Field(default=None, max_length=2000)
+    is_public: bool = True  # False = only the owner can see it
 
 
 # Request model for editing a collection. Only the fields sent are changed.
 class CollectionUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    description: Optional[str] = Field(default=None, max_length=2000)   # null or "" clears it
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)  # null or "" clears it
 
 
 # Response model for returning collection data.
 class CollectionOut(BaseModel):
     id: UUID
     name: str
-    description: Optional[str] = None
-    owner_id: Optional[UUID] = None   # None for collections made before accounts existed
+    description: str | None = None
+    owner_id: UUID | None = None  # None for collections made before accounts existed
     is_public: bool = True
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 # Response model for returning document metadata.
@@ -89,12 +89,12 @@ class DocumentOut(BaseModel):
     id: UUID
     collection_id: UUID
     original_filename: str
-    source_archive: Optional[str] = None
+    source_archive: str | None = None
     file_type: str
     size_bytes: int
     sha256: str
     status: str
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 # Response model for returning page metadata.
@@ -111,9 +111,9 @@ class PageOut(BaseModel):
 class FileResult(BaseModel):
     filename: str
     status: Literal["accepted", "rejected"]
-    document_id: Optional[UUID] = None
-    page_count: Optional[int] = None
-    error: Optional[str] = None
+    document_id: UUID | None = None
+    page_count: int | None = None
+    error: str | None = None
 
 
 # Summary of a batch upload.
@@ -123,8 +123,9 @@ class UploadReport(BaseModel):
     rejected: int
     results: list[FileResult]
 
+
 class CountrySummary(BaseModel):
-    country_code: str        # ISO 3166-1 alpha-2, e.g. "CH"
+    country_code: str  # ISO 3166-1 alpha-2, e.g. "CH"
     mention_count: int
     place_count: int
 
@@ -132,8 +133,8 @@ class CountrySummary(BaseModel):
 class MentionOut(BaseModel):
     mention_id: UUID
     place_name: str
-    snippet: Optional[str] = None
-    page_id: UUID            # the page image to open
+    snippet: str | None = None
+    page_id: UUID  # the page image to open
     page_number: int
     document_id: UUID
     document_name: str

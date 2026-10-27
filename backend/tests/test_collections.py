@@ -2,8 +2,7 @@ from tests.conftest import register
 
 
 def test_create_and_list_collection(client):
-    r = client.post("/api/collections",
-                    json={"name": "Letters of Henri Dupont, 1850-1855"})
+    r = client.post("/api/collections", json={"name": "Letters of Henri Dupont, 1850-1855"})
     assert r.status_code == 201
     created = r.json()
     assert created["name"].startswith("Letters of Henri")
@@ -25,6 +24,7 @@ def test_unknown_collection_is_404(client):
 
 def test_bad_uuid_is_422(client):
     assert client.get("/api/collections/not-a-uuid").status_code == 422
+
 
 def test_owner_can_rename_and_change_description(client, collection):
     url = f"/api/collections/{collection['id']}"

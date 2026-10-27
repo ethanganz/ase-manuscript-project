@@ -1,8 +1,8 @@
 """
-What it does: builds a dictionary of old spellings. 
+What it does: builds a dictionary of old spellings.
 For example “Tigurum” means place number l587, which is Zürich.
 
-Why it exists: the place list only knows modern names like “Zürich”. 
+Why it exists: the place list only knows modern names like “Zürich”.
 The editors of the letters already marked old spellings inside the letters, and this file collects all of them.
 How you use it: we run it once on our computer, and it saves a data file.
 
@@ -31,11 +31,11 @@ We only read the <text> of each letter (the original text and its notes),
 NOT the German summary at the top, because the summary uses modern German
 spellings that are not what the manuscripts contain.
 
-1. place_variants.json (the dictionary) gives only a place number. 
-For example, “Tigurum” gives l587. It has no country, no coordinates, and not even the name “Zürich”. 
+1. place_variants.json (the dictionary) gives only a place number.
+For example, “Tigurum” gives l587. It has no country, no coordinates, and not even the name “Zürich”.
 It only says which place the editors meant.
 
-2. localities.xml (the place list) gives the details for that number. 
+2. localities.xml (the place list) gives the details for that number.
 For l587 it gives the name (Zürich), the coordinates, and the country as a word, which is “Schweiz” if the editors filled it in.
 
 git clone https://github.com/stazh/bullinger-korpus-tei
@@ -50,13 +50,14 @@ How to run
     python -m services.place_variants  <folder with the letters>  resources/place_variants.json
     from Dunya: I already did this, if there is any new update you can do it again.
 """
+
 import json
 import re
 import sys
 import unicodedata
+import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from pathlib import Path
-import xml.etree.ElementTree as ET
 
 TEI = "{http://www.tei-c.org/ns/1.0}"
 
@@ -66,10 +67,9 @@ TEI = "{http://www.tei-c.org/ns/1.0}"
 # - /ns/1.0 — Indicates the namespace identifier.
 # - XML namespace — A way to identify which vocabulary XML elements belong to, helping software distinguish elements with the same name but different meanings.
 
-PLACE_ID = re.compile(r"^l\d+$")          # ids of the place list look like "l587"
+PLACE_ID = re.compile(r"^l\d+$")  # ids of the place list look like "l587"
 # It is used to remove punctuation or whitespace from the beginning and end of a piece of text.
-_EDGE_PUNCTUATION = " \t\r\n.,;:!?()[]{}«»\"'“”‘’" 
-
+_EDGE_PUNCTUATION = " \t\r\n.,;:!?()[]{}«»\"'“”‘’"
 
 
 def normalize_word(word: str | None) -> str:
@@ -85,7 +85,7 @@ def normalize_word(word: str | None) -> str:
     """
     text = (word or "").casefold()
     text = text.replace("ę", "ae").replace("æ", "ae").replace("œ", "oe")
-    text = unicodedata.normalize("NFKD", text)          # split letters from accents
+    text = unicodedata.normalize("NFKD", text)  # split letters from accents
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     text = text.replace("j", "i").replace("v", "u")
     return " ".join(text.split())
@@ -119,7 +119,7 @@ def extract_pairs(xml_path: Path) -> list[tuple[str, str]] | None:
 
 def build_variants(corpus_dir: Path) -> dict:
     """Reads every .xml file below corpus_dir and builds the dictionary."""
-    ids: dict[str, Counter] = defaultdict(Counter)       # normalized word -> {place id: times}
+    ids: dict[str, Counter] = defaultdict(Counter)  # normalized word -> {place id: times}
     written_forms: dict[str, Counter] = defaultdict(Counter)  # ... -> {spelling as written: times}
     stats: Counter = Counter()
 
@@ -146,8 +146,10 @@ def build_variants(corpus_dir: Path) -> dict:
 
     variants = {
         key: {
-            "ids": dict(counter.most_common()),                      # most frequent first
-            "forms": [f for f, _ in written_forms[key].most_common(5)],  # for humans reading the file
+            "ids": dict(counter.most_common()),  # most frequent first
+            "forms": [
+                f for f, _ in written_forms[key].most_common(5)
+            ],  # for humans reading the file
         }
         for key, counter in sorted(ids.items())
     }
@@ -165,8 +167,9 @@ def main(argv: list[str]) -> int:
 
     result = build_variants(corpus_dir)
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(result, ensure_ascii=False, separators=(",", ":")),
-                      encoding="utf-8")
+    output.write_text(
+        json.dumps(result, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
+    )
 
     meta = result["meta"]
     print(f"Letters read:        {meta.get('letters', 0)}")

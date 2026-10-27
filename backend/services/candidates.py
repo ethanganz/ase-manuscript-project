@@ -1,10 +1,10 @@
 """
-What it does: for one word, our list can contain several possible places. 
-This file picks the right one. If two entries are the same city (like Zürich twice, 1 km apart), 
+What it does: for one word, our list can contain several possible places.
+This file picks the right one. If two entries are the same city (like Zürich twice, 1 km apart),
 it merges them and keeps the one that has a country.
 
 Why it exists: we need one clear answer per word.
-Special case: if the entries are really different places (two cities called Frankfurt), 
+Special case: if the entries are really different places (two cities called Frankfurt),
 it says “unsure, a person must decide”. It never picks one at random
 
 
@@ -14,7 +14,7 @@ Our model gives each mention a list called place_candidates. Example for
   1. "Zürich"  47.3769,  8.5417  from a diary PDF       -> no country
   2. "Zürich"  47.36667, 8.55    from the official list -> country "Schweiz"
 
-  
+
 What we do
 ----------
 1. Throw away candidates without coordinates (we cannot put them on a map).
@@ -34,6 +34,7 @@ The answer is a Choice with a status:
   Where the country comes from: candidates.py takes the country from the place list (localities.xml).
     It does not work it out by itself. We do the mapping, for example “Schweiz” becomes “CH”,
 """
+
 import math
 import unicodedata
 from dataclasses import dataclass, field
@@ -47,18 +48,18 @@ SAME_PLACE_KM = 10
 
 @dataclass
 class Choice:
-    status: str                     # resolved | no_country | ambiguous | no_candidates
-    reason: str                     # one sentence a human can read
+    status: str  # resolved | no_country | ambiguous | no_candidates
+    reason: str  # one sentence a human can read
     name: str | None = None
     latitude: float | None = None
     longitude: float | None = None
     country_code: str | None = None
-    official_place_id: str | None = None   # e.g. "l587" in the Bullinger list
+    official_place_id: str | None = None  # e.g. "l587" in the Bullinger list
     alternatives: list[dict] = field(default_factory=list)  # filled when ambiguous
 
 
 def _plain_name(name: str | None) -> str:
-    """"Zürich" and "Zurich" and " zürich " all become "zurich"."""
+    """ "Zürich" and "Zurich" and " zürich " all become "zurich"."""
     text = unicodedata.normalize("NFKD", (name or "").strip().casefold())
     return "".join(ch for ch in text if not unicodedata.combining(ch))
 
@@ -66,9 +67,12 @@ def _plain_name(name: str | None) -> str:
 def _distance_km(a: dict, b: dict) -> float:
     """Straight-line distance between two candidates on the globe (haversine)."""
     lat1, lon1, lat2, lon2 = map(
-        math.radians, (a["latitude"], a["longitude"], b["latitude"], b["longitude"]))
-    h = (math.sin((lat2 - lat1) / 2) ** 2
-         + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2)
+        math.radians, (a["latitude"], a["longitude"], b["latitude"], b["longitude"])
+    )
+    h = (
+        math.sin((lat2 - lat1) / 2) ** 2
+        + math.cos(lat1) * math.cos(lat2) * math.sin((lon2 - lon1) / 2) ** 2
+    )
     return 2 * 6371 * math.asin(math.sqrt(h))
 
 
@@ -77,8 +81,10 @@ def _official_country(candidate: dict) -> str:
 
 
 def _same_place(a: dict, b: dict) -> bool:
-    return (_plain_name(a.get("canonical_name")) == _plain_name(b.get("canonical_name"))
-            and _distance_km(a, b) <= SAME_PLACE_KM)
+    return (
+        _plain_name(a.get("canonical_name")) == _plain_name(b.get("canonical_name"))
+        and _distance_km(a, b) <= SAME_PLACE_KM
+    )
 
 
 def group_candidates(candidates: list[dict]) -> list[list[dict]]:
@@ -112,8 +118,11 @@ def _describe(candidate: dict) -> dict:
 
 def choose_candidate(candidates: list[dict] | None) -> Choice:
     # 1. keep only candidates that have coordinates
-    usable = [c for c in (candidates or [])
-              if c.get("latitude") is not None and c.get("longitude") is not None]
+    usable = [
+        c
+        for c in (candidates or [])
+        if c.get("latitude") is not None and c.get("longitude") is not None
+    ]
     if not usable:
         return Choice("no_candidates", "No candidate with coordinates")
 
@@ -129,12 +138,12 @@ def choose_candidate(candidates: list[dict] | None) -> Choice:
     # 4. one place: take its best candidate
     best = _best_of_group(groups[0])
     official_id = best.get("official_place_id")
-    common = dict(
-        name=best.get("canonical_name"),
-        latitude=best["latitude"],
-        longitude=best["longitude"],
-        official_place_id=official_id,
-    )
+    common = {
+        "name": best.get("canonical_name"),
+        "latitude": best["latitude"],
+        "longitude": best["longitude"],
+        "official_place_id": official_id,
+    }
 
     # 5. country word -> code
     country_word = _official_country(best)
@@ -145,6 +154,11 @@ def choose_candidate(candidates: list[dict] | None) -> Choice:
         return Choice(
             "no_country",
             f"Place found, but the country '{country_word}' cannot be turned into a code",
-            **common)
-    return Choice("resolved", f"Matched to {best.get('canonical_name')} ({code})",
-                  country_code=code, **common)
+            **common,
+        )
+    return Choice(
+        "resolved",
+        f"Matched to {best.get('canonical_name')} ({code})",
+        country_code=code,
+        **common,
+    )

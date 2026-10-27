@@ -1,7 +1,7 @@
 """Turns the country words used in the Bullinger place list into 2-letter codes.
 
 
-What it does: changes a country word into a short code. 
+What it does: changes a country word into a short code.
 “Schweiz” becomes “CH”, “Italien” becomes “IT”.
 
 Why this exists
@@ -24,55 +24,71 @@ Rules we follow
 
 
 
-Decisions I made that 
+Decisions I made that
 These are judgment calls, and anyone can disagree with them:
 
 England, Scotland and Great Britain all become GB. The map has one United Kingdom shape.
 Slavonia becomes HR, Persia becomes IR. Each lies inside one modern country.
-Continents, old empires and regions spanning several countries return None. 
-That includes Europa, Preussen, Judäa, Makedonien and Podolien. 
-They go to a person for review and are never guessed. 
+Continents, old empires and regions spanning several countries return None.
+That includes Europa, Preussen, Judäa, Makedonien and Podolien.
+They go to a person for review and are never guessed.
 """
-
-
 
 # word in the place list -> code. Keys are written naturally; matching ignores
 # upper/lower case (so "österreich" and "Österreich" are the same).
 COUNTRY_CODES: dict[str, str] = {
     # --- Germany, Switzerland, Austria, Liechtenstein
-    "Deutschland": "DE", "Germany": "DE",
+    "Deutschland": "DE",
+    "Germany": "DE",
     "Schweiz": "CH",
     "Österreich": "AT",
     "Liechtenstein": "LI",
     # --- France, Italy, Spain, Portugal
-    "Frankreich": "FR", "France": "FR",
-    "Italien": "IT", "Italia": "IT", "Italy": "IT",
-    "Spanien": "ES", "España": "ES",
+    "Frankreich": "FR",
+    "France": "FR",
+    "Italien": "IT",
+    "Italia": "IT",
+    "Italy": "IT",
+    "Spanien": "ES",
+    "España": "ES",
     "Portugal": "PT",
     # --- United Kingdom and Ireland
-    "England": "GB", "Schottland": "GB", "Grossbritannien": "GB", "United Kingdom": "GB",
+    "England": "GB",
+    "Schottland": "GB",
+    "Grossbritannien": "GB",
+    "United Kingdom": "GB",
     "Irland": "IE",
     # --- Benelux
-    "Niederlande": "NL", "Nederland": "NL", "Holland": "NL",
+    "Niederlande": "NL",
+    "Nederland": "NL",
+    "Holland": "NL",
     "Belgien": "BE",
     "Luxemburg": "LU",
     # --- North and Baltic
-    "Dänemark": "DK", "Danmark": "DK",
+    "Dänemark": "DK",
+    "Danmark": "DK",
     "Schweden": "SE",
     "Norwegen": "NO",
-    "Estland": "EE", "Lettland": "LV", "Litauen": "LT",
+    "Estland": "EE",
+    "Lettland": "LV",
+    "Litauen": "LT",
     # --- Central and Eastern Europe
-    "Polen": "PL", "Polska": "PL",
+    "Polen": "PL",
+    "Polska": "PL",
     "Tschechien": "CZ",
-    "Slowakei": "SK", "Slovensko": "SK",
-    "Ungarn": "HU", "Magyarország": "HU",
+    "Slowakei": "SK",
+    "Slovensko": "SK",
+    "Ungarn": "HU",
+    "Magyarország": "HU",
     "Rumänien": "RO",
     "Bulgarien": "BG",
     "Russland": "RU",
     "Ukraine": "UA",
-    "Belarus": "BY", "Weißrussland": "BY",
+    "Belarus": "BY",
+    "Weißrussland": "BY",
     # --- Balkans, Mediterranean
-    "Kroatien": "HR", "Slawonien": "HR",   # Slavonia lies in Croatia today
+    "Kroatien": "HR",
+    "Slawonien": "HR",  # Slavonia lies in Croatia today
     "Slowenien": "SI",
     "Serbien": "RS",
     "Montenegro": "ME",
@@ -82,17 +98,19 @@ COUNTRY_CODES: dict[str, str] = {
     "Malta": "MT",
     "Zypern": "CY",
     # --- Middle East, Asia, Africa, Americas
-    "Türkei": "TR", "Turkey": "TR",
+    "Türkei": "TR",
+    "Turkey": "TR",
     "Syrien": "SY",
     "Libanon": "LB",
     "Israel": "IL",
     "Irak": "IQ",
-    "Persien": "IR",                        # Persia = Iran
+    "Persien": "IR",  # Persia = Iran
     "Armenien": "AM",
     "Indien": "IN",
     "Ägypten": "EG",
-    "Libyien": "LY",                        # typo for "Libyen" in the source list
-    "Tunesien": "TN", "Tunesische Republik": "TN",
+    "Libyien": "LY",  # typo for "Libyen" in the source list
+    "Tunesien": "TN",
+    "Tunesische Republik": "TN",
     "Algerien": "DZ",
     "Äthiopien": "ET",
     "Peru": "PE",
@@ -121,7 +139,7 @@ _LOOKUP = {name.casefold(): code for name, code in COUNTRY_CODES.items()}
 
 
 def country_code(name: str | None) -> str | None:
-    """"Schweiz" -> "CH". Returns None for empty values, unknown words, and
+    """ "Schweiz" -> "CH". Returns None for empty values, unknown words, and
     everything listed in NOT_MAPPED (never guesses)."""
     if not name:
         return None

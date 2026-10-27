@@ -13,7 +13,5 @@ def get_supabase() -> Client:
     ``service_role`` key here so server-side writes bypass Row Level Security.
     """
     if not config.SUPABASE_URL or not config.SUPABASE_API_KEY:
-        raise RuntimeError(
-            "SUPABASE_URL and SUPABASE_API_KEY must be set in backend/.env"
-        )
+        raise RuntimeError("SUPABASE_URL and SUPABASE_API_KEY must be set in backend/.env")
     return create_client(config.SUPABASE_URL, config.SUPABASE_API_KEY)

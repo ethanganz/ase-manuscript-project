@@ -6,8 +6,13 @@ from services.candidates import choose_candidate, group_candidates
 def cand(name, lat, lng, country=None, official_id=None, cid="x"):
     """Builds a candidate shaped like the ones in place_candidates."""
     fields = {"settlement": name, "country": country} if country else {}
-    out = {"id": cid, "canonical_name": name, "latitude": lat, "longitude": lng,
-           "official_name_fields": fields}
+    out = {
+        "id": cid,
+        "canonical_name": name,
+        "latitude": lat,
+        "longitude": lng,
+        "official_name_fields": fields,
+    }
     if official_id:
         out["official_place_id"] = official_id
     return out
@@ -15,7 +20,7 @@ def cand(name, lat, lng, country=None, official_id=None, cid="x"):
 
 # --- the REAL candidates from shaotong file ;)) --------------------------------
 TIGURUM = [
-    cand("Zürich", 47.3769, 8.5417, cid="zurich"),                       # diary PDF, no country
+    cand("Zürich", 47.3769, 8.5417, cid="zurich"),  # diary PDF, no country
     cand("Zürich", 47.36667, 8.55, "Schweiz", "l587", "bullinger:l587"),  # official list
 ]
 BASILEE = [
@@ -29,7 +34,7 @@ def test_tigurum_two_candidates_become_one_zurich_in_switzerland():
     r = choose_candidate(TIGURUM)
     assert (r.status, r.name, r.country_code) == ("resolved", "Zürich", "CH")
     assert r.official_place_id == "l587"
-    assert (r.latitude, r.longitude) == (47.36667, 8.55)      # the official one wins
+    assert (r.latitude, r.longitude) == (47.36667, 8.55)  # the official one wins
 
 
 def test_basel():
@@ -58,14 +63,21 @@ def test_no_candidates():
 
 
 def test_candidates_without_coordinates_are_ignored():
-    broken = {"id": "y", "canonical_name": "Nowhere", "latitude": None, "longitude": None}
+    broken = {
+        "id": "y",
+        "canonical_name": "Nowhere",
+        "latitude": None,
+        "longitude": None,
+    }
     assert choose_candidate([broken]).status == "no_candidates"
     assert choose_candidate([broken, *ARGENTINA]).status == "resolved"
 
 
 def test_same_name_far_apart_is_ambiguous_and_never_guessed():
-    frankfurt = [cand("Frankfurt", 50.11, 8.68, "Deutschland"),            # am Main
-                 cand("Frankfurt", 52.34, 14.55, "Deutschland")]           # an der Oder
+    frankfurt = [
+        cand("Frankfurt", 50.11, 8.68, "Deutschland"),  # am Main
+        cand("Frankfurt", 52.34, 14.55, "Deutschland"),
+    ]  # an der Oder
     r = choose_candidate(frankfurt)
     assert r.status == "ambiguous" and r.country_code is None and r.latitude is None
     assert len(r.alternatives) == 2
@@ -77,8 +89,12 @@ def test_different_names_close_together_are_different_places():
 
 
 def test_accents_and_capitals_do_not_split_a_place():
-    r = choose_candidate([cand("Zurich", 47.3769, 8.5417),
-                          cand("ZÜRICH", 47.36667, 8.55, "Schweiz", "l587")])
+    r = choose_candidate(
+        [
+            cand("Zurich", 47.3769, 8.5417),
+            cand("ZÜRICH", 47.36667, 8.55, "Schweiz", "l587"),
+        ]
+    )
     assert r.status == "resolved" and r.country_code == "CH"
 
 

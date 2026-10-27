@@ -1,38 +1,49 @@
 """Data-access layer.
 
-Routes and services only talk to the ``Repository`` interface. 
+Routes and services only talk to the ``Repository`` interface.
 Production uses
-``SupabaseRepository``; 
+``SupabaseRepository``;
 tests use ``InMemoryRepository`` .
 The repository is the only place that touches the database.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 from uuid import uuid4
+
 from database.paging import fetch_all
+
 
 class Repository:
     """Common interface for data access."""
 
-    def create_user(self, email: str, password_hash: str,
-                    first_name: Optional[str], last_name: Optional[str]) -> dict: ...
-    def get_user(self, user_id: str) -> Optional[dict]: ...
-    def get_user_by_email(self, email: str) -> Optional[dict]: ...
+    def create_user(
+        self,
+        email: str,
+        password_hash: str,
+        first_name: str | None,
+        last_name: str | None,
+    ) -> dict: ...
+    def get_user(self, user_id: str) -> dict | None: ...
+    def get_user_by_email(self, email: str) -> dict | None: ...
 
-    def create_collection(self, name: str, description: Optional[str],
-                          owner_id: str, is_public: bool = True) -> dict: ...
+    def create_collection(
+        self,
+        name: str,
+        description: str | None,
+        owner_id: str,
+        is_public: bool = True,
+    ) -> dict: ...
     def list_collections(self) -> list[dict]: ...
-    def get_collection(self, collection_id: str) -> Optional[dict]: ...
-    def update_collection(self, collection_id: str, fields: dict) -> Optional[dict]: ...
+    def get_collection(self, collection_id: str) -> dict | None: ...
+    def update_collection(self, collection_id: str, fields: dict) -> dict | None: ...
 
     def create_document(self, doc: dict) -> dict: ...
     def delete_document(self, document_id: str) -> None: ...
-    def get_document(self, document_id: str) -> Optional[dict]: ...
+    def get_document(self, document_id: str) -> dict | None: ...
     def list_documents(self, collection_id: str) -> list[dict]: ...
 
     def create_pages(self, pages: list[dict]) -> None: ...
-    def get_page(self, page_id: str) -> Optional[dict]: ...
+    def get_page(self, page_id: str) -> dict | None: ...
     def list_pages(self, document_id: str) -> list[dict]: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
@@ -45,17 +56,23 @@ class InMemoryRepository(Repository):
         self.collections: dict[str, dict] = {}
         self.documents: dict[str, dict] = {}
         self.pages: dict[str, dict] = {}
-        self.mention_details: list[dict] = []   # tests put rows here
+        self.mention_details: list[dict] = []  # tests put rows here
 
     @staticmethod
     def _now() -> str:
         """Return the current UTC timestamp."""
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     def create_user(self, email, password_hash, first_name, last_name):
         """Create and store a user."""
-        row = {"id": str(uuid4()), "email": email, "password_hash": password_hash,
-               "first_name": first_name, "last_name": last_name, "created_at": self._now()}
+        row = {
+            "id": str(uuid4()),
+            "email": email,
+            "password_hash": password_hash,
+            "first_name": first_name,
+            "last_name": last_name,
+            "created_at": self._now(),
+        }
         self.users[row["id"]] = row
         return dict(row)
 
@@ -71,15 +88,24 @@ class InMemoryRepository(Repository):
 
     def create_collection(self, name, description, owner_id, is_public=True):
         """Create and store a collection."""
-        row = {"id": str(uuid4()), "name": name, "description": description,
-               "owner_id": owner_id, "is_public": is_public, "created_at": self._now()}
+        row = {
+            "id": str(uuid4()),
+            "name": name,
+            "description": description,
+            "owner_id": owner_id,
+            "is_public": is_public,
+            "created_at": self._now(),
+        }
         self.collections[row["id"]] = row
         return dict(row)
 
     def list_collections(self):
         """Return all collections, newest first."""
-        return sorted((dict(c) for c in self.collections.values()),
-                      key=lambda c: c["created_at"], reverse=True)
+        return sorted(
+            (dict(c) for c in self.collections.values()),
+            key=lambda c: c["created_at"],
+            reverse=True,
+        )
 
     def get_collection(self, collection_id):
         """Return a collection by ID."""
@@ -114,8 +140,7 @@ class InMemoryRepository(Repository):
 
     def list_documents(self, collection_id):
         """Return documents belonging to a collection."""
-        rows = [dict(d) for d in self.documents.values()
-                if d["collection_id"] == collection_id]
+        rows = [dict(d) for d in self.documents.values() if d["collection_id"] == collection_id]
         return sorted(rows, key=lambda d: d["created_at"])
 
     def create_pages(self, pages):
@@ -132,7 +157,7 @@ class InMemoryRepository(Repository):
         """Return pages belonging to a document."""
         rows = [dict(p) for p in self.pages.values() if p["document_id"] == document_id]
         return sorted(rows, key=lambda p: p["page_number"])
-    
+
     def list_mention_details(self, collection_id):
         return [dict(r) for r in self.mention_details if r["collection_id"] == collection_id]
 
@@ -152,9 +177,18 @@ class SupabaseRepository(Repository):
 
     def create_user(self, email, password_hash, first_name, last_name):
         """Create a user in Supabase."""
-        res = self._t("users").insert(
-            {"email": email, "password_hash": password_hash,
-             "first_name": first_name, "last_name": last_name}).execute()
+        res = (
+            self._t("users")
+            .insert(
+                {
+                    "email": email,
+                    "password_hash": password_hash,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                }
+            )
+            .execute()
+        )
         return res.data[0]
 
     def get_user(self, user_id):
@@ -169,9 +203,18 @@ class SupabaseRepository(Repository):
 
     def create_collection(self, name, description, owner_id, is_public=True):
         """Create a collection in Supabase."""
-        res = self._t("collections").insert(
-            {"name": name, "description": description, "owner_id": owner_id,
-             "is_public": is_public}).execute()
+        res = (
+            self._t("collections")
+            .insert(
+                {
+                    "name": name,
+                    "description": description,
+                    "owner_id": owner_id,
+                    "is_public": is_public,
+                }
+            )
+            .execute()
+        )
         return res.data[0]
 
     def list_collections(self):
@@ -204,8 +247,13 @@ class SupabaseRepository(Repository):
 
     def list_documents(self, collection_id):
         """Return documents belonging to a collection."""
-        res = (self._t("documents").select("*").eq("collection_id", collection_id)
-               .order("created_at").execute())
+        res = (
+            self._t("documents")
+            .select("*")
+            .eq("collection_id", collection_id)
+            .order("created_at")
+            .execute()
+        )
         return res.data or []
 
     def create_pages(self, pages):
@@ -220,12 +268,22 @@ class SupabaseRepository(Repository):
 
     def list_pages(self, document_id):
         """Return pages belonging to a document."""
-        res = (self._t("pages").select("*").eq("document_id", document_id)
-               .order("page_number").execute())
+        res = (
+            self._t("pages")
+            .select("*")
+            .eq("document_id", document_id)
+            .order("page_number")
+            .execute()
+        )
         return res.data or []
-    
+
     def list_mention_details(self, collection_id):
         # order() gives a stable order, which paging needs to avoid skipping rows.
-        return fetch_all(lambda: (self._t("mention_details").select("*")
-            .eq("collection_id", collection_id)
-            .order("mention_id")))
+        return fetch_all(
+            lambda: (
+                self._t("mention_details")
+                .select("*")
+                .eq("collection_id", collection_id)
+                .order("mention_id")
+            )
+        )

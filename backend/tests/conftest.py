@@ -14,6 +14,7 @@ from services.storage import InMemoryStorage
 
 register_heif_opener()
 
+
 # shared setup: a fake database, fake storage and sample-file makers):
 @pytest.fixture
 def repo():
@@ -36,8 +37,15 @@ def anon_client(repo, storage):
 
 
 def register(client, email="ada@example.com", password="correct-horse"):
-    return client.post("/api/auth/register", json={
-        "first_name": "Ada", "last_name": "Lovelace", "email": email, "password": password})
+    return client.post(
+        "/api/auth/register",
+        json={
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+            "email": email,
+            "password": password,
+        },
+    )
 
 
 @pytest.fixture
