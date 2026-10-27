@@ -4,7 +4,11 @@ import { getDocuments, getPages } from "../api/documents.js";
 import { pageImageUrl } from "../api/map.js";
 
 /**
- * Thumbnail of the first page of a collection's first document.
+ * Thumbnail of the first page of a collection's documents.
+ *
+ * Starts with the first document; if it has no pages or its image can't be
+ * loaded, the next document is tried, so one broken upload doesn't hide the
+ * preview of the whole collection.
  *
  * Pass `documents` if they are already loaded, otherwise `collectionId` and
  * the documents are fetched here. `className` sets the size and corners.
@@ -15,12 +19,21 @@ export function CollectionPreview({
   className = "h-20 w-16 rounded-md",
 }) {
   const [fetchedDocuments, setFetchedDocuments] = useState(undefined);
+  const [documentIndex, setDocumentIndex] = useState(0);
   const [pageId, setPageId] = useState(null);
   const [failed, setFailed] = useState(false);
 
   const allDocuments = documents ?? fetchedDocuments;
   const firstDocument = allDocuments?.[0];
-  const firstDocumentId = firstDocument?.id;
+  const currentDocument = allDocuments?.[documentIndex];
+  const currentDocumentId = currentDocument?.id;
+  const outOfDocuments =
+    allDocuments && allDocuments.length > 0 && !currentDocument;
+
+  const tryNextDocument = () => {
+    setPageId(null);
+    setDocumentIndex((index) => index + 1);
+  };
 
   useEffect(() => {
     if (documents || !collectionId) return;
@@ -36,21 +49,21 @@ export function CollectionPreview({
   }, [documents, collectionId]);
 
   useEffect(() => {
-    if (!firstDocumentId) return;
+    if (!currentDocumentId) return;
     let cancelled = false;
 
-    getPages(firstDocumentId)
+    getPages(currentDocumentId)
       .then((pages) => {
         if (cancelled) return;
         if (pages[0]) setPageId(pages[0].id);
-        else setFailed(true);
+        else tryNextDocument();
       })
-      .catch(() => !cancelled && setFailed(true));
+      .catch(() => !cancelled && tryNextDocument());
 
     return () => {
       cancelled = true;
     };
-  }, [firstDocumentId]);
+  }, [currentDocumentId]);
 
   const frame = `flex items-center justify-center overflow-hidden border border-[#e0e6e0] bg-[#eef3ef] ${className}`;
 
@@ -62,7 +75,7 @@ export function CollectionPreview({
     );
   }
 
-  if (failed) {
+  if (failed || outOfDocuments) {
     return (
       <div className={frame} title={firstDocument?.original_filename}>
         <FileText className="size-5 text-[#a3b3a9]" />
@@ -78,9 +91,9 @@ export function CollectionPreview({
     <div className={`${frame} bg-white`}>
       <img
         src={pageImageUrl(pageId)}
-        alt={`First page of ${firstDocument.original_filename}`}
+        alt={`First page of ${currentDocument.original_filename}`}
         loading="lazy"
-        onError={() => setFailed(true)}
+        onError={tryNextDocument}
         className="size-full object-cover object-top"
       />
     </div>

@@ -4,6 +4,7 @@ from fastapi.security import APIKeyCookie
 import config
 from database.repository import Repository, SupabaseRepository
 from services.auth import decode_token
+from services.email import EmailSender, ResendEmailSender
 from services.storage import ObjectStorage, SupabaseStorage
 
 # Reads the login cookie. Also shows the lock icon in the API docs.
@@ -18,6 +19,11 @@ def get_repo() -> Repository:
 def get_storage() -> ObjectStorage:
     """FastAPI dependency. Tests override this with in-memory storage."""
     return SupabaseStorage()
+
+
+def get_mailer() -> EmailSender:
+    """FastAPI dependency. Tests override this with an in-memory outbox."""
+    return ResendEmailSender()
 
 
 def get_optional_user(

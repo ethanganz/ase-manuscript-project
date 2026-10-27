@@ -21,6 +21,21 @@ JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", str(7 * 24 * 60)))
 AUTH_COOKIE_NAME = "access_token"
 AUTH_COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
 
+# --- Email verification (sent with Resend) ----------------------------------
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+
+# Resend only delivers from a domain verified in your Resend account. The
+# default test sender (onboarding@resend.dev) can only send to the email of
+# the Resend account owner.
+EMAIL_FROM = os.getenv("EMAIL_FROM", "Manuscript Archive <onboarding@resend.dev>")
+
+# Where the app is opened in the browser; the link in the email points here.
+# Include any sub-path, e.g. https://example.com/apps/staging
+APP_BASE_URL = os.getenv("APP_BASE_URL", "http://localhost:5173").rstrip("/")
+
+# How long the link in the email works: 24 hours
+EMAIL_VERIFY_EXPIRE_HOURS = int(os.getenv("EMAIL_VERIFY_EXPIRE_HOURS", "24"))
+
 # --- Upload pipeline -------------------------------------------------------
 # Permanent files are stored in Supabase Storage.
 SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "documents")
