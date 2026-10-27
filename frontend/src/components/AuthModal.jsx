@@ -1,9 +1,6 @@
 import { MailCheck, X } from 'lucide-react'
 import { useState } from 'react'
 import { login, register, resendVerification } from '../api/auth.js'
-import { X } from "lucide-react";
-import { useState } from "react";
-import { login, register } from "../api/auth.js";
 
 const inputClass =
   "mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";

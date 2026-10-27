@@ -1,9 +1,6 @@
 import { ArrowUpRight, MoreHorizontal, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { CollectionPreview } from '../tools/helpers.jsx'
-import { ArrowUpRight, Lock, MoreHorizontal, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { CollectionPreview } from "../tools/helpers.jsx";
 
 const COLLECTIONS_PER_PAGE = 6;
 

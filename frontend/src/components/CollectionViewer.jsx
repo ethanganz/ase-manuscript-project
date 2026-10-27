@@ -11,30 +11,6 @@ import { getMockPlaces, getMockTranscription } from '../data/mockTranscriptions.
 import { countryDisplayName } from '../libraray/countries.js'
 import { useFetch } from '../libraray/useFetch.js'
 import { ReportCollectionModal } from './ReportCollectionModal.jsx'
-  ArrowLeft,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  Expand,
-  FileText,
-  MapPin,
-  Maximize2,
-  Minimize2,
-  Shrink,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
-import { getDocuments, getPages } from "../api/documents.js";
-import { pageImageUrl } from "../api/map.js";
-import {
-  getMockPlaces,
-  getMockTranscription,
-} from "../data/mockTranscriptions.js";
-import { countryDisplayName } from "../libraray/countries.js";
-import { useFetch } from "../libraray/useFetch.js";
 
 // On large screens the viewer fills the window below the 76px header (minus
 // the 2rem App padding), so page and transcription show without scrolling.

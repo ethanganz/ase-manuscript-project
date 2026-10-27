@@ -2,22 +2,8 @@ import { ArrowLeft, Bell, CalendarDays, FileText, Flag, FolderOpen, HardDrive, L
 import { useEffect, useState } from 'react'
 import { getDocuments, updateCollection } from '../api/documents.js'
 import { reportReasonLabel } from '../api/reports.js'
-import { CollectionPreview, formatBytes, formatDate, StatCard } from '../tools/helpers.jsx'
-import {
-  ArrowLeft,
-  CalendarDays,
-  FileText,
-  FolderOpen,
-  HardDrive,
-  Lock,
-  Mail,
-  Pencil,
-  Plus,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { getDocuments, updateCollection } from "../api/documents.js";
-import { CollectionPreview, StatCard } from "../tools/helpers.jsx";
-import { formatDate, formatBytes } from "../tools/formatters.js";
+import { CollectionPreview, StatCard } from '../tools/helpers.jsx'
+import { formatBytes, formatDate } from '../tools/formatters.js'
 
 // Columns of the "My collections" table. Below `sm` only preview, name, size and edit are shown.
 const TABLE_COLUMNS =
