@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { Globe, Lock, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 const uploadStages = [
@@ -15,6 +15,8 @@ export function CreateCollectionModal({
   onCollectionChange,
   name,
   description,
+  isPublic,
+  onIsPublicChange,
   selectedFiles,
   submitting,
   error,
@@ -126,6 +128,38 @@ export function CreateCollectionModal({
                   maxLength={2000}
                 />
               </label>
+
+              <fieldset disabled={submitting}>
+                <legend className="text-sm font-medium text-[#374b45]">Visibility</legend>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {[
+                    { value: true, icon: Globe, label: 'Public', hint: 'Everyone can browse it' },
+                    { value: false, icon: Lock, label: 'Private', hint: 'Only you can see it' },
+                  ].map(({ value, icon: Icon, label, hint }) => (
+                    <label
+                      key={label}
+                      className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#6f8e7b] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 ${
+                        isPublic === value
+                          ? 'border-[#1e3b35] bg-[#f5faf6]'
+                          : 'border-[#dfe5df] hover:bg-[#fbfcfa]'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="visibility"
+                        checked={isPublic === value}
+                        onChange={() => onIsPublicChange(value)}
+                        className="sr-only"
+                      />
+                      <Icon className="mt-0.5 size-4 shrink-0 text-[#476d5b]" />
+                      <span>
+                        <span className="block text-sm font-medium text-[#1e302b]">{label}</span>
+                        <span className="block text-xs text-[#7e8b85]">{hint}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
             </>
           )}
 

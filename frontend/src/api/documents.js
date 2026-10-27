@@ -10,17 +10,56 @@ export async function getCollections() {
   return response.json()
 }
 
-export async function createCollection(name, description) {
+export async function getDocuments(collectionId) {
+  const response = await apiFetch(`/api/collections/${collectionId}/documents`)
+
+  if (!response.ok) {
+    throw new Error('Unable to load documents')
+  }
+
+  return response.json()
+}
+
+export async function getPages(documentId) {
+  const response = await apiFetch(`/api/documents/${documentId}/pages`)
+
+  if (!response.ok) {
+    throw new Error('Unable to load pages')
+  }
+
+  return response.json()
+}
+
+export async function createCollection(name, description, isPublic = true) {
   const response = await apiFetch('/api/collections', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, description }),
+    body: JSON.stringify({ name, description, is_public: isPublic }),
   })
 
   const data = await response.json().catch(() => ({}))
 
   if (!response.ok) {
     throw new Error(data.detail || `Could not create collection (${response.status})`)
+  }
+
+  return data
+}
+
+/** Change a collection's name and/or description. Only the owner may do this. */
+export async function updateCollection(collectionId, changes) {
+  const response = await apiFetch(`/api/collections/${collectionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(changes),
+  })
+
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    // 422 from FastAPI is a list of field errors; show the first one.
+    const detail = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail
+    throw new Error(detail || `Could not save changes (${response.status})`)
   }
 
   return data

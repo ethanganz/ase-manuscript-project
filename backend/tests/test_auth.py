@@ -66,7 +66,7 @@ def test_tampered_token_rejected(anon_client):
 
 
 def test_browsing_is_public_but_creating_needs_login(anon_client, repo):
-    owner = repo.create_user("ada@example.com", "x", "Ada Lovelace")
+    owner = repo.create_user("ada@example.com", "x", "Ada", "Lovelace")
     collection = repo.create_collection("Letters", None, owner["id"])
 
     assert anon_client.get("/api/collections").status_code == 200
@@ -88,3 +88,40 @@ def test_only_the_owner_can_upload(client):
     assert len(client.get(f"/api/collections/{mine['id']}/documents").json()) == 1
     r = upload(client, mine["id"], ("b.png", make_image("PNG")))
     assert r.status_code == 403
+
+
+def test_collections_are_public_by_default(client):
+    created = client.post("/api/collections", json={"name": "Open letters"}).json()
+    assert created["is_public"] is True
+
+    client.post("/api/auth/logout")
+    assert [c["id"] for c in client.get("/api/collections").json()] == [created["id"]]
+
+
+def test_private_collection_is_only_visible_to_its_owner(client):
+    private = client.post("/api/collections",
+                          json={"name": "Diary", "is_public": False}).json()
+    assert private["is_public"] is False
+    r = upload(client, private["id"], ("a.png", make_image("PNG")))
+    document_id = r.json()["results"][0]["document_id"]
+    page_id = client.get(f"/api/documents/{document_id}/pages").json()[0]["id"]
+
+    urls = [
+        f"/api/collections/{private['id']}",
+        f"/api/collections/{private['id']}/documents",
+        f"/api/collections/{private['id']}/map/countries",
+        f"/api/documents/{document_id}",
+        f"/api/documents/{document_id}/pages",
+        f"/api/pages/{page_id}/image",
+    ]
+
+    # The owner sees everything.
+    assert [c["id"] for c in client.get("/api/collections").json()] == [private["id"]]
+    assert all(client.get(url).status_code == 200 for url in urls)
+
+    # A visitor and another user see nothing, and cannot tell it exists.
+    client.post("/api/auth/logout")
+    for _ in range(2):
+        assert client.get("/api/collections").json() == []
+        assert [client.get(url).status_code for url in urls] == [404] * len(urls)
+        register(client, email="bob@example.com")
