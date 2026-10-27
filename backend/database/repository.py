@@ -16,14 +16,16 @@ from database.paging import fetch_all
 class Repository:
     """Common interface for data access."""
 
-    def create_user(self, email: str, password_hash: str,
-                    first_name: Optional[str], last_name: Optional[str]) -> dict: ...
-    def get_user(self, user_id: str) -> Optional[dict]: ...
-    def get_user_by_email(self, email: str) -> Optional[dict]: ...
-    def mark_email_verified(self, user_id: str) -> Optional[dict]: ...
+    def create_user(
+        self, email: str, password_hash: str, first_name: str | None, last_name: str | None
+    ) -> dict: ...
+    def get_user(self, user_id: str) -> dict | None: ...
+    def get_user_by_email(self, email: str) -> dict | None: ...
+    def mark_email_verified(self, user_id: str) -> dict | None: ...
 
-    def create_collection(self, name: str, description: Optional[str],
-                          owner_id: str, is_public: bool = True) -> dict: ...
+    def create_collection(
+        self, name: str, description: str | None, owner_id: str, is_public: bool = True
+    ) -> dict: ...
     def list_collections(self) -> list[dict]: ...
     def get_collection(self, collection_id: str) -> dict | None: ...
     def update_collection(self, collection_id: str, fields: dict) -> dict | None: ...
@@ -38,8 +40,9 @@ class Repository:
     def list_pages(self, document_id: str) -> list[dict]: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
-    def create_report(self, collection_id: str, reporter_id: str, reason: str,
-                      details: Optional[str]) -> dict: ...
+    def create_report(
+        self, collection_id: str, reporter_id: str, reason: str, details: str | None
+    ) -> dict: ...
     def has_reported(self, collection_id: str, reporter_id: str) -> bool: ...
     def list_reports_for_collections(self, collection_ids: list[str]) -> list[dict]: ...
     def mark_reports_read(self, collection_ids: list[str]) -> None: ...
@@ -53,7 +56,7 @@ class InMemoryRepository(Repository):
         self.collections: dict[str, dict] = {}
         self.documents: dict[str, dict] = {}
         self.pages: dict[str, dict] = {}
-        self.mention_details: list[dict] = []   # tests put rows here
+        self.mention_details: list[dict] = []  # tests put rows here
         self.reports: dict[str, dict] = {}
 
     @staticmethod
@@ -63,9 +66,16 @@ class InMemoryRepository(Repository):
 
     def create_user(self, email, password_hash, first_name, last_name):
         """Create and store a user."""
-        row = {"id": str(uuid4()), "email": email, "password_hash": password_hash,
-               "first_name": first_name, "last_name": last_name, "created_at": self._now(),
-               "email_verified": False, "email_verified_at": None}
+        row = {
+            "id": str(uuid4()),
+            "email": email,
+            "password_hash": password_hash,
+            "first_name": first_name,
+            "last_name": last_name,
+            "created_at": self._now(),
+            "email_verified": False,
+            "email_verified_at": None,
+        }
         self.users[row["id"]] = row
         return dict(row)
 
@@ -164,16 +174,24 @@ class InMemoryRepository(Repository):
 
     def create_report(self, collection_id, reporter_id, reason, details):
         """Create and store a report."""
-        row = {"id": str(uuid4()), "collection_id": collection_id, "reporter_id": reporter_id,
-               "reason": reason, "details": details, "read_at": None,
-               "created_at": self._now()}
+        row = {
+            "id": str(uuid4()),
+            "collection_id": collection_id,
+            "reporter_id": reporter_id,
+            "reason": reason,
+            "details": details,
+            "read_at": None,
+            "created_at": self._now(),
+        }
         self.reports[row["id"]] = row
         return dict(row)
 
     def has_reported(self, collection_id, reporter_id):
         """Return True if this user already reported this collection."""
-        return any(r["collection_id"] == collection_id and r["reporter_id"] == reporter_id
-                   for r in self.reports.values())
+        return any(
+            r["collection_id"] == collection_id and r["reporter_id"] == reporter_id
+            for r in self.reports.values()
+        )
 
     def list_reports_for_collections(self, collection_ids):
         """Return the reports on these collections, newest first."""
@@ -228,10 +246,17 @@ class SupabaseRepository(Repository):
 
     def mark_email_verified(self, user_id):
         """Mark the user's email as verified. Returns the new row, or None if missing."""
-        res = self._t("users").update(
-            {"email_verified": True,
-             "email_verified_at": datetime.now(timezone.utc).isoformat()}
-        ).eq("id", user_id).execute()
+        res = (
+            self._t("users")
+            .update(
+                {
+                    "email_verified": True,
+                    "email_verified_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            .eq("id", user_id)
+            .execute()
+        )
         return res.data[0] if res.data else None
 
     def create_collection(self, name, description, owner_id, is_public=True):
@@ -312,33 +337,64 @@ class SupabaseRepository(Repository):
 
     def list_mention_details(self, collection_id):
         # order() gives a stable order, which paging needs to avoid skipping rows.
-        return fetch_all(lambda: (self._t("mention_details").select("*")
-            .eq("collection_id", collection_id)
-            .order("mention_id")))
+        return fetch_all(
+            lambda: (
+                self._t("mention_details")
+                .select("*")
+                .eq("collection_id", collection_id)
+                .order("mention_id")
+            )
+        )
 
     def create_report(self, collection_id, reporter_id, reason, details):
         """Create a report in Supabase."""
-        res = self._t("reports").insert(
-            {"collection_id": collection_id, "reporter_id": reporter_id,
-             "reason": reason, "details": details}).execute()
+        res = (
+            self._t("reports")
+            .insert(
+                {
+                    "collection_id": collection_id,
+                    "reporter_id": reporter_id,
+                    "reason": reason,
+                    "details": details,
+                }
+            )
+            .execute()
+        )
         return res.data[0]
 
     def has_reported(self, collection_id, reporter_id):
         """Return True if this user already reported this collection."""
-        res = (self._t("reports").select("id").eq("collection_id", collection_id)
-               .eq("reporter_id", reporter_id).limit(1).execute())
+        res = (
+            self._t("reports")
+            .select("id")
+            .eq("collection_id", collection_id)
+            .eq("reporter_id", reporter_id)
+            .limit(1)
+            .execute()
+        )
         return bool(res.data)
 
     def list_reports_for_collections(self, collection_ids):
         """Return the reports on these collections, newest first."""
         if not collection_ids:
             return []
-        return fetch_all(lambda: (self._t("reports").select("*")
-            .in_("collection_id", collection_ids)
-            .order("created_at", desc=True).order("id")))
+        return fetch_all(
+            lambda: (
+                self._t("reports")
+                .select("*")
+                .in_("collection_id", collection_ids)
+                .order("created_at", desc=True)
+                .order("id")
+            )
+        )
 
     def mark_reports_read(self, collection_ids):
         """Mark every unread report on these collections as read."""
         if collection_ids:
-            (self._t("reports").update({"read_at": datetime.now(timezone.utc).isoformat()})
-             .in_("collection_id", collection_ids).is_("read_at", "null").execute())
+            (
+                self._t("reports")
+                .update({"read_at": datetime.now(timezone.utc).isoformat()})
+                .in_("collection_id", collection_ids)
+                .is_("read_at", "null")
+                .execute()
+            )

@@ -62,12 +62,17 @@ def create_email_token(user_id: str, email: str) -> str:
     The email is included so the link stops working if the address changes.
     """
     now = datetime.now(timezone.utc)
-    payload = {"sub": user_id, "email": email, "purpose": VERIFY_EMAIL_PURPOSE,
-               "iat": now, "exp": now + timedelta(hours=config.EMAIL_VERIFY_EXPIRE_HOURS)}
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "purpose": VERIFY_EMAIL_PURPOSE,
+        "iat": now,
+        "exp": now + timedelta(hours=config.EMAIL_VERIFY_EXPIRE_HOURS),
+    }
     return jwt.encode(payload, config.JWT_SECRET, algorithm=ALGORITHM)
 
 
-def decode_email_token(token: str) -> Optional[tuple[str, str]]:
+def decode_email_token(token: str) -> tuple[str, str] | None:
     """Return (user ID, email) from a verification token, or None if invalid or expired."""
     try:
         payload = jwt.decode(token, config.JWT_SECRET, algorithms=[ALGORITHM])

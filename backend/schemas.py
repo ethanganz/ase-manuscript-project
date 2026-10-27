@@ -56,10 +56,10 @@ class UserLogin(BaseModel):
 class UserOut(BaseModel):
     id: UUID
     email: str
-    first_name: Optional[str] = None   # "First Last"
-    last_name: Optional[str] = None   # "First Last"
+    first_name: str | None = None  # "First Last"
+    last_name: str | None = None  # "First Last"
     email_verified: bool = False
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 # Request model for opening the link in the verification email.
@@ -101,7 +101,7 @@ ReportReason = Literal["spam", "inappropriate", "copyright", "misleading", "othe
 # Request model for reporting a collection.
 class ReportCreate(BaseModel):
     reason: ReportReason
-    details: Optional[str] = Field(default=None, max_length=1000)
+    details: str | None = Field(default=None, max_length=1000)
 
 
 # A report on one of the user's own collections. Never says who reported it.
@@ -110,8 +110,8 @@ class ReceivedReportOut(BaseModel):
     collection_id: UUID
     collection_name: str
     reason: ReportReason
-    details: Optional[str] = None
-    created_at: Optional[datetime] = None
+    details: str | None = None
+    created_at: datetime | None = None
     read: bool
 
 

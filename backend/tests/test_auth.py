@@ -1,7 +1,6 @@
 import config
 from services.auth import create_email_token, create_token
-from tests.conftest import (make_image, register, register_verified, upload,
-                            verification_token)
+from tests.conftest import make_image, register, register_verified, upload, verification_token
 
 
 def test_register_sends_email_but_does_not_log_in(anon_client):
@@ -30,15 +29,17 @@ def test_verifying_logs_in(anon_client):
 
 def test_unverified_user_cannot_log_in(anon_client):
     register(anon_client)
-    r = anon_client.post("/api/auth/login",
-                         json={"email": "ada@example.com", "password": "correct-horse"})
+    r = anon_client.post(
+        "/api/auth/login", json={"email": "ada@example.com", "password": "correct-horse"}
+    )
     assert r.status_code == 403
     assert "verify" in r.json()["detail"]
     assert anon_client.get("/api/auth/me").status_code == 401
 
     # A wrong password still gets the usual answer, verified or not.
-    r = anon_client.post("/api/auth/login",
-                         json={"email": "ada@example.com", "password": "wrong-pass"})
+    r = anon_client.post(
+        "/api/auth/login", json={"email": "ada@example.com", "password": "wrong-pass"}
+    )
     assert r.status_code == 401
 
 
@@ -55,7 +56,7 @@ def test_bad_verification_tokens_rejected(anon_client, repo):
     user = repo.get_user_by_email("ada@example.com")
     bad_tokens = [
         "not.a.token",
-        create_token(user["id"]),                               # a login token
+        create_token(user["id"]),  # a login token
         create_email_token(user["id"], "someone@example.com"),  # for another address
         create_email_token("00000000-0000-0000-0000-000000000000", "ada@example.com"),
     ]
@@ -86,8 +87,7 @@ def test_resend_verification(anon_client):
     assert len(anon_client.mailer.outbox) == 2
 
     # Unknown and already verified addresses get the same answer but no email.
-    unknown = anon_client.post("/api/auth/resend-verification",
-                               json={"email": "bob@example.com"})
+    unknown = anon_client.post("/api/auth/resend-verification", json={"email": "bob@example.com"})
     assert unknown.status_code == 202 and unknown.json() == r.json()
     anon_client.post("/api/auth/verify-email", json={"token": verification_token(anon_client)})
     anon_client.post("/api/auth/resend-verification", json={"email": "ada@example.com"})

@@ -10,7 +10,6 @@ import { Hero } from "./components/Hero.jsx";
 import {
   createCollection,
   getCollections,
-  uploadDocument,
   uploadFiles,
 } from "./api/documents.js";
 import {
@@ -72,10 +71,6 @@ function App() {
   const [search, setSearch] = useState("");
   const [remoteCollections, setRemoteCollections] = useState([]);
   const [selectedCollection, setSelectedCollection] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState(null);
-  const [uploadError, setUploadError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [collectionName, setCollectionName] = useState("");
   const [collectionDescription, setCollectionDescription] = useState("");
@@ -202,30 +197,6 @@ function App() {
     };
     // Reload on login/logout: private collections are only listed for their owner.
   }, [user?.id]);
-
-  async function handleUpload(event) {
-    event.preventDefault();
-
-    if (!selectedCollection || !selectedFile) {
-      setUploadError("Select a collection and choose a file");
-      return;
-    }
-
-    setUploading(true);
-    setUploadError("");
-    setUploadResult(null);
-
-    try {
-      const result = await uploadDocument(selectedCollection, selectedFile);
-      setUploadResult(result);
-      setSelectedFile(null);
-      event.target.reset();
-    } catch (error) {
-      setUploadError(error.message);
-    } finally {
-      setUploading(false);
-    }
-  }
 
   async function handleCreateCollection(event) {
     event.preventDefault();
@@ -378,17 +349,6 @@ function App() {
               onSearchChange={setSearch}
               isLoading={loadingCollections}
             />
-            {/* <UploadSection
-              collections={remoteCollections}
-              selectedCollection={selectedCollection}
-              onCollectionChange={setSelectedCollection}
-              selectedFile={selectedFile}
-              onFileChange={setSelectedFile}
-              uploading={uploading}
-              uploadError={uploadError}
-              uploadResult={uploadResult}
-              onSubmit={handleUpload}
-            /> */}
             {/* <ResearchSection places={places} /> */}
             <MapSection collections={remoteCollections} />
           </>

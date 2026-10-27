@@ -2,6 +2,7 @@
 
 Production: Resend (https://resend.com). Tests: in-memory outbox.
 """
+
 import html
 import logging
 
@@ -30,8 +31,13 @@ class ResendEmailSender(EmailSender):
             response = httpx.post(
                 RESEND_URL,
                 headers={"Authorization": f"Bearer {config.RESEND_API_KEY}"},
-                json={"from": config.EMAIL_FROM, "to": [to], "subject": subject,
-                      "html": html_body, "text": text_body},
+                json={
+                    "from": config.EMAIL_FROM,
+                    "to": [to],
+                    "subject": subject,
+                    "html": html_body,
+                    "text": text_body,
+                },
                 timeout=10,
             )
         except httpx.HTTPError as exc:

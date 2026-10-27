@@ -4,8 +4,14 @@ import config
 from database.repository import Repository
 from deps import get_current_user, get_mailer, get_repo
 from schemas import ResendVerification, UserCreate, UserLogin, UserOut, VerifyEmail
-from services.auth import (DUMMY_HASH, create_email_token, create_token, decode_email_token,
-                           hash_password, verify_password)
+from services.auth import (
+    DUMMY_HASH,
+    create_email_token,
+    create_token,
+    decode_email_token,
+    hash_password,
+    verify_password,
+)
 from services.email import EmailSender, send_verification_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -32,8 +38,12 @@ def _queue_verification_email(tasks: BackgroundTasks, mailer: EmailSender, user:
 
 
 @router.post("/register", response_model=UserOut, status_code=201)
-def register(payload: UserCreate, tasks: BackgroundTasks,
-             repo: Repository = Depends(get_repo), mailer: EmailSender = Depends(get_mailer)):
+def register(
+    payload: UserCreate,
+    tasks: BackgroundTasks,
+    repo: Repository = Depends(get_repo),
+    mailer: EmailSender = Depends(get_mailer),
+):
     """Create an account and email a verification link. Does not log in."""
     if repo.get_user_by_email(payload.email) is not None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
@@ -53,8 +63,9 @@ def login(payload: UserLogin, response: Response, repo: Repository = Depends(get
         raise HTTPException(status_code=401, detail="Invalid email or password")
     # Only said after a correct password, so it does not reveal which emails exist.
     if not user.get("email_verified"):
-        raise HTTPException(status_code=403,
-                            detail="Please verify your email first. Check your inbox for the link.")
+        raise HTTPException(
+            status_code=403, detail="Please verify your email first. Check your inbox for the link."
+        )
     _start_session(response, user)
     return user
 
@@ -66,8 +77,9 @@ def verify_email(payload: VerifyEmail, response: Response, repo: Repository = De
     user = repo.get_user(claims[0]) if claims else None
     # The email must still match, so an old link stops working after a change.
     if user is None or user["email"] != claims[1]:
-        raise HTTPException(status_code=400,
-                            detail="This verification link is invalid or has expired")
+        raise HTTPException(
+            status_code=400, detail="This verification link is invalid or has expired"
+        )
     if not user.get("email_verified"):
         user = repo.mark_email_verified(user["id"])
     _start_session(response, user)
@@ -75,9 +87,12 @@ def verify_email(payload: VerifyEmail, response: Response, repo: Repository = De
 
 
 @router.post("/resend-verification", status_code=202)
-def resend_verification(payload: ResendVerification, tasks: BackgroundTasks,
-                        repo: Repository = Depends(get_repo),
-                        mailer: EmailSender = Depends(get_mailer)):
+def resend_verification(
+    payload: ResendVerification,
+    tasks: BackgroundTasks,
+    repo: Repository = Depends(get_repo),
+    mailer: EmailSender = Depends(get_mailer),
+):
     """Email a new verification link.
 
     Always gives the same answer, so it does not reveal which emails have an account.

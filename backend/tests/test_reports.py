@@ -18,8 +18,10 @@ def _log_in_as_bob(client):
 
 def test_owner_sees_report_without_reporter(client):
     bobs = _bobs_collection(client)
-    r = client.post(f"/api/collections/{bobs['id']}/reports",
-                    json={"reason": "spam", "details": "  Same file 50 times  "})
+    r = client.post(
+        f"/api/collections/{bobs['id']}/reports",
+        json={"reason": "spam", "details": "  Same file 50 times  "},
+    )
     assert r.status_code == 201
 
     _log_in_as_bob(client)
