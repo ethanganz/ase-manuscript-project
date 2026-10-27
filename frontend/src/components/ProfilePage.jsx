@@ -16,12 +16,8 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getDocuments, updateCollection } from "../api/documents.js";
-import {
-  CollectionPreview,
-  formatBytes,
-  formatDate,
-  StatCard,
-} from "../tools/helpers.jsx";
+import { CollectionPreview, StatCard } from "../tools/helpers.jsx";
+import { formatDate, formatBytes } from "../tools/formatters.js";
 
 // Columns of the "My collections" table. Below `sm` only preview, name, size and edit are shown.
 const TABLE_COLUMNS =
