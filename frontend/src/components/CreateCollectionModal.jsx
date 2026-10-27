@@ -1,12 +1,12 @@
-import { Globe, Lock, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { Globe, Lock, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 const uploadStages = [
-  'Preparing files',
-  'Analyzing documents',
-  'Indexing manuscript pages',
-  'Finalizing collection',
-]
+  "Preparing files",
+  "Analyzing documents",
+  "Indexing manuscript pages",
+  "Finalizing collection",
+];
 
 export function CreateCollectionModal({
   isOpen,
@@ -26,39 +26,40 @@ export function CreateCollectionModal({
   onClose,
   onSubmit,
 }) {
-  const [stageIndex, setStageIndex] = useState(0)
-  const [progress, setProgress] = useState(0)
+  const [stageIndex, setStageIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     if (!submitting) {
-      setStageIndex(0)
-      setProgress(0)
-      return
+      setStageIndex(0);
+      setProgress(0);
+      return;
     }
 
     const stageTimer = setInterval(() => {
-      setStageIndex((current) => (current + 1) % uploadStages.length)
-    }, 900)
+      setStageIndex((current) => (current + 1) % uploadStages.length);
+    }, 900);
 
     const progressTimer = setInterval(() => {
       setProgress((current) => {
-        const next = current + 12
-        return next >= 96 ? 96 : next
-      })
-    }, 350)
+        const next = current + 12;
+        return next >= 96 ? 96 : next;
+      });
+    }, 350);
 
     return () => {
-      clearInterval(stageTimer)
-      clearInterval(progressTimer)
-    }
-  }, [submitting])
+      clearInterval(stageTimer);
+      clearInterval(progressTimer);
+    };
+  }, [submitting]);
 
   const activeLabel = useMemo(() => {
-    if (!submitting) return selectedCollectionId ? 'Upload files' : 'Create collection'
-    return uploadStages[stageIndex]
-  }, [selectedCollectionId, stageIndex, submitting])
+    if (!submitting)
+      return selectedCollectionId ? "Upload files" : "Create collection";
+    return uploadStages[stageIndex];
+  }, [selectedCollectionId, stageIndex, submitting]);
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -130,18 +131,30 @@ export function CreateCollectionModal({
               </label>
 
               <fieldset disabled={submitting}>
-                <legend className="text-sm font-medium text-[#374b45]">Visibility</legend>
+                <legend className="text-sm font-medium text-[#374b45]">
+                  Visibility
+                </legend>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   {[
-                    { value: true, icon: Globe, label: 'Public', hint: 'Everyone can browse it' },
-                    { value: false, icon: Lock, label: 'Private', hint: 'Only you can see it' },
+                    {
+                      value: true,
+                      icon: Globe,
+                      label: "Public",
+                      hint: "Everyone can browse it",
+                    },
+                    {
+                      value: false,
+                      icon: Lock,
+                      label: "Private",
+                      hint: "Only you can see it",
+                    },
                   ].map(({ value, icon: Icon, label, hint }) => (
                     <label
                       key={label}
                       className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#6f8e7b] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60 ${
                         isPublic === value
-                          ? 'border-[#1e3b35] bg-[#f5faf6]'
-                          : 'border-[#dfe5df] hover:bg-[#fbfcfa]'
+                          ? "border-[#1e3b35] bg-[#f5faf6]"
+                          : "border-[#dfe5df] hover:bg-[#fbfcfa]"
                       }`}
                     >
                       <input
@@ -153,8 +166,12 @@ export function CreateCollectionModal({
                       />
                       <Icon className="mt-0.5 size-4 shrink-0 text-[#476d5b]" />
                       <span>
-                        <span className="block text-sm font-medium text-[#1e302b]">{label}</span>
-                        <span className="block text-xs text-[#7e8b85]">{hint}</span>
+                        <span className="block text-sm font-medium text-[#1e302b]">
+                          {label}
+                        </span>
+                        <span className="block text-xs text-[#7e8b85]">
+                          {hint}
+                        </span>
                       </span>
                     </label>
                   ))}
@@ -170,7 +187,9 @@ export function CreateCollectionModal({
               multiple
               accept=".pdf,.jpg,.jpeg,.png,.heic,.zip"
               disabled={submitting}
-              onChange={(event) => onFileChange(Array.from(event.target.files || []))}
+              onChange={(event) =>
+                onFileChange(Array.from(event.target.files || []))
+              }
               className="mt-2 block w-full rounded-lg border border-dashed border-[#cbd8cc] bg-[#fbfcfa] px-3 py-2.5 text-sm file:mr-4 file:rounded file:border-0 file:bg-[#1e3b35] file:px-3 file:py-2 file:text-white disabled:cursor-not-allowed disabled:opacity-60"
             />
           </label>
@@ -224,14 +243,22 @@ export function CreateCollectionModal({
             </button>
             <button
               type="submit"
-              disabled={submitting || (selectedCollectionId === '' && name.trim() === '') || selectedFiles.length === 0}
+              disabled={
+                submitting ||
+                (selectedCollectionId === "" && name.trim() === "") ||
+                selectedFiles.length === 0
+              }
               className="rounded-lg bg-[#1e3b35] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? activeLabel : selectedCollectionId ? 'Upload files' : 'Create collection'}
+              {submitting
+                ? activeLabel
+                : selectedCollectionId
+                  ? "Upload files"
+                  : "Create collection"}
             </button>
           </div>
         </form>
       </div>
     </div>
-  )
+  );
 }

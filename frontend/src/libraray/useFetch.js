@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Loads data when `key` changes and tells you if it is still loading.
@@ -14,30 +14,32 @@ import { useEffect, useRef, useState } from 'react'
  * which key each answer belongs to, so a late, stale answer is never shown.
  */
 export function useFetch(key, fetcher) {
-  const [result, setResult] = useState({ key: '', data: null, error: '' })
-  const fetcherRef = useRef(fetcher)
+  const [result, setResult] = useState({ key: "", data: null, error: "" });
+  const fetcherRef = useRef(fetcher);
 
   useEffect(() => {
-    fetcherRef.current = fetcher
-  })
+    fetcherRef.current = fetcher;
+  });
 
   useEffect(() => {
-    if (!key) return undefined
-    let cancelled = false
+    if (!key) return undefined;
+    let cancelled = false;
     fetcherRef
       .current()
-      .then((data) => !cancelled && setResult({ key, data, error: '' }))
-      .catch((e) => !cancelled && setResult({ key, data: null, error: e.message }))
+      .then((data) => !cancelled && setResult({ key, data, error: "" }))
+      .catch(
+        (e) => !cancelled && setResult({ key, data: null, error: e.message }),
+      );
     return () => {
-      cancelled = true
-    }
-  }, [key])
+      cancelled = true;
+    };
+  }, [key]);
 
-  const isCurrent = result.key === key // does the stored answer belong to the current key?????
-  
+  const isCurrent = result.key === key; // does the stored answer belong to the current key?????
+
   return {
     data: isCurrent ? result.data : null,
-    error: isCurrent ? result.error : '',
+    error: isCurrent ? result.error : "",
     loading: Boolean(key) && !isCurrent,
-  }
+  };
 }

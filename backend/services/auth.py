@@ -1,6 +1,6 @@
 """Password hashing and login tokens."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
@@ -32,7 +32,7 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def create_token(user_id: str) -> str:
     """Return a signed token that identifies the user."""
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     payload = {
         "sub": user_id,
         "iat": now,

@@ -7,7 +7,7 @@ tests use ``InMemoryRepository`` .
 The repository is the only place that touches the database.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from database.paging import fetch_all
@@ -61,7 +61,7 @@ class InMemoryRepository(Repository):
     @staticmethod
     def _now() -> str:
         """Return the current UTC timestamp."""
-        return datetime.now(UTC).isoformat()
+        return datetime.now(timezone.utc).isoformat()
 
     def create_user(self, email, password_hash, first_name, last_name):
         """Create and store a user."""

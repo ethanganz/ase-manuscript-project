@@ -1,4 +1,4 @@
-import { Upload } from 'lucide-react'
+import { Upload } from "lucide-react";
 
 export function UploadSection({
   collections,
@@ -19,9 +19,12 @@ export function UploadSection({
             <Upload className="size-5" />
           </div>
           <div>
-            <h2 className="font-serif text-2xl tracking-[-0.03em]">Upload a document</h2>
+            <h2 className="font-serif text-2xl tracking-[-0.03em]">
+              Upload a document
+            </h2>
             <p className="mt-1 text-sm text-[#7e8b85]">
-              Supported: PDF, JPEG, PNG, and HEIC. The record is created immediately.
+              Supported: PDF, JPEG, PNG, and HEIC. The record is created
+              immediately.
             </p>
           </div>
         </div>
@@ -49,7 +52,9 @@ export function UploadSection({
               className="mt-2 block w-full rounded-lg border border-dashed border-[#cbd8cc] bg-[#fbfcfa] px-3 py-2.5 text-sm file:mr-4 file:rounded file:border-0 file:bg-[#1e3b35] file:px-3 file:py-2 file:text-white"
               type="file"
               accept=".pdf,.jpg,.jpeg,.png,.heic"
-              onChange={(event) => onFileChange(event.target.files?.[0] || null)}
+              onChange={(event) =>
+                onFileChange(event.target.files?.[0] || null)
+              }
             />
           </label>
 
@@ -70,10 +75,10 @@ export function UploadSection({
             disabled={uploading || !selectedCollection || !selectedFile}
             className="inline-flex items-center justify-center rounded-lg bg-[#1e3b35] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {uploading ? 'Uploading…' : 'Upload document'}
+            {uploading ? "Uploading…" : "Upload document"}
           </button>
         </form>
       </div>
     </section>
-  )
+  );
 }

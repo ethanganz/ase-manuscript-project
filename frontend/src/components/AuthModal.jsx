@@ -1,51 +1,56 @@
-import { X } from 'lucide-react'
-import { useState } from 'react'
-import { login, register } from '../api/auth.js'
+import { X } from "lucide-react";
+import { useState } from "react";
+import { login, register } from "../api/auth.js";
 
 const inputClass =
-  'mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]'
+  "mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
 
 /** Login and sign-up popup. Calls onAuthenticated(user) on success. */
 export function AuthModal({ isOpen, onAuthenticated, onClose }) {
-  const [mode, setMode] = useState('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const isRegister = mode === 'register'
+  const isRegister = mode === "register";
 
   async function handleSubmit(event) {
-    event.preventDefault()
-    setSubmitting(true)
-    setError('')
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
     try {
       const user = isRegister
-        ? await register(firstName.trim(), lastName.trim(), email.trim(), password)
-        : await login(email.trim(), password)
-      onAuthenticated(user)
+        ? await register(
+            firstName.trim(),
+            lastName.trim(),
+            email.trim(),
+            password,
+          )
+        : await login(email.trim(), password);
+      onAuthenticated(user);
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
     }
   }
 
   function switchMode() {
-    setMode(isRegister ? 'login' : 'register')
-    setError('')
+    setMode(isRegister ? "login" : "register");
+    setError("");
   }
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-sm rounded-xl border border-[#dfe5df] bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <h2 className="font-serif text-2xl tracking-[-0.03em] text-[#1e302b]">
-            {isRegister ? 'Create an account' : 'Log in'}
+            {isRegister ? "Create an account" : "Log in"}
           </h2>
           <button
             type="button"
@@ -57,7 +62,9 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
           </button>
         </div>
         <p className="mt-1 text-sm text-[#7e8b85]">
-          {isRegister ? 'An account lets you create collections and upload documents.' : 'Welcome back to the archive.'}
+          {isRegister
+            ? "An account lets you create collections and upload documents."
+            : "Welcome back to the archive."}
         </p>
 
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -76,7 +83,7 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
                   required
                 />
               </label>
-              
+
               <label className="block text-sm font-medium text-[#374b45]">
                 Last name
                 <input
@@ -114,16 +121,22 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
               onChange={(event) => setPassword(event.target.value)}
               disabled={submitting}
               className={inputClass}
-              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              autoComplete={isRegister ? "new-password" : "current-password"}
               minLength={isRegister ? 8 : undefined}
               maxLength={72}
               required
             />
-            {isRegister && <span className="mt-1 block text-xs font-normal text-[#8a9790]">At least 8 characters.</span>}
+            {isRegister && (
+              <span className="mt-1 block text-xs font-normal text-[#8a9790]">
+                At least 8 characters.
+              </span>
+            )}
           </label>
 
           {error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>
+            <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {error}
+            </p>
           )}
 
           <button
@@ -131,17 +144,25 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
             disabled={submitting}
             className="w-full rounded-lg bg-[#1e3b35] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? 'Please wait…' : isRegister ? 'Create account' : 'Log in'}
+            {submitting
+              ? "Please wait…"
+              : isRegister
+                ? "Create account"
+                : "Log in"}
           </button>
         </form>
 
         <p className="mt-5 text-center text-sm text-[#6e7975]">
-          {isRegister ? 'Already have an account?' : 'New here?'}{' '}
-          <button type="button" onClick={switchMode} className="font-medium text-[#476d5b] hover:underline">
-            {isRegister ? 'Log in' : 'Create an account'}
+          {isRegister ? "Already have an account?" : "New here?"}{" "}
+          <button
+            type="button"
+            onClick={switchMode}
+            className="font-medium text-[#476d5b] hover:underline"
+          >
+            {isRegister ? "Log in" : "Create an account"}
           </button>
         </p>
       </div>
     </div>
-  )
+  );
 }
