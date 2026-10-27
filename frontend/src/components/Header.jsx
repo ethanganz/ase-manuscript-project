@@ -1,4 +1,4 @@
-import { Bell } from 'lucide-react'
+import { Bell } from "lucide-react";
 
 export function Header({ user, unreadCount = 0, onLogin, onLogout }) {
   return (
@@ -32,12 +32,12 @@ export function Header({ user, unreadCount = 0, onLogin, onLogout }) {
             <a
               href="#notifications"
               className="relative rounded-full p-2 text-[#476d5b] transition-colors hover:bg-[#edf1ed]"
-              title={`${unreadCount} new ${unreadCount === 1 ? 'notification' : 'notifications'}`}
-              aria-label={`${unreadCount} new ${unreadCount === 1 ? 'notification' : 'notifications'}`}
+              title={`${unreadCount} new ${unreadCount === 1 ? "notification" : "notifications"}`}
+              aria-label={`${unreadCount} new ${unreadCount === 1 ? "notification" : "notifications"}`}
             >
               <Bell className="size-5" />
               <span className="absolute -right-0.5 -top-0.5 flex size-[18px] items-center justify-center rounded-full bg-[#a04a3a] text-[10px] font-semibold text-white">
-                {unreadCount > 9 ? '9+' : unreadCount}
+                {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             </a>
           )}

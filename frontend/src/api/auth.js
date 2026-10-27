@@ -21,10 +21,12 @@ async function postJson(url, body) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     // 422 from FastAPI is a list of field errors; show the first one.
-    const detail = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail
-    const error = new Error(detail || `Request failed (${response.status})`)
-    error.status = response.status
-    throw error
+    const detail = Array.isArray(data.detail)
+      ? data.detail[0]?.msg
+      : data.detail;
+    const error = new Error(detail || `Request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
   }
   return data;
 }
@@ -54,12 +56,12 @@ export function register(firstName, lastName, email, password) {
 
 /** Confirms the email with the token from the link, and logs in. */
 export function verifyEmail(token) {
-  return postJson('/api/auth/verify-email', { token })
+  return postJson("/api/auth/verify-email", { token });
 }
 
 /** Asks for a new verification email. Answers the same whether or not the account exists. */
 export function resendVerification(email) {
-  return postJson('/api/auth/resend-verification', { email })
+  return postJson("/api/auth/resend-verification", { email });
 }
 
 export async function logout() {

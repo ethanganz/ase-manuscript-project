@@ -13,22 +13,27 @@ import { pageImageUrl } from "../api/map.js";
  * Pass `documents` if they are already loaded, otherwise `collectionId` and
  * the documents are fetched here. `className` sets the size and corners.
  */
-export function CollectionPreview({ documents, collectionId, className = 'h-20 w-16 rounded-md' }) {
-  const [fetchedDocuments, setFetchedDocuments] = useState(undefined)
-  const [documentIndex, setDocumentIndex] = useState(0)
-  const [pageId, setPageId] = useState(null)
-  const [failed, setFailed] = useState(false)
+export function CollectionPreview({
+  documents,
+  collectionId,
+  className = "h-20 w-16 rounded-md",
+}) {
+  const [fetchedDocuments, setFetchedDocuments] = useState(undefined);
+  const [documentIndex, setDocumentIndex] = useState(0);
+  const [pageId, setPageId] = useState(null);
+  const [failed, setFailed] = useState(false);
 
-  const allDocuments = documents ?? fetchedDocuments
-  const firstDocument = allDocuments?.[0]
-  const currentDocument = allDocuments?.[documentIndex]
-  const currentDocumentId = currentDocument?.id
-  const outOfDocuments = allDocuments && allDocuments.length > 0 && !currentDocument
+  const allDocuments = documents ?? fetchedDocuments;
+  const firstDocument = allDocuments?.[0];
+  const currentDocument = allDocuments?.[documentIndex];
+  const currentDocumentId = currentDocument?.id;
+  const outOfDocuments =
+    allDocuments && allDocuments.length > 0 && !currentDocument;
 
   const tryNextDocument = () => {
-    setPageId(null)
-    setDocumentIndex((index) => index + 1)
-  }
+    setPageId(null);
+    setDocumentIndex((index) => index + 1);
+  };
 
   useEffect(() => {
     if (documents || !collectionId) return;
@@ -44,21 +49,21 @@ export function CollectionPreview({ documents, collectionId, className = 'h-20 w
   }, [documents, collectionId]);
 
   useEffect(() => {
-    if (!currentDocumentId) return
-    let cancelled = false
+    if (!currentDocumentId) return;
+    let cancelled = false;
 
     getPages(currentDocumentId)
       .then((pages) => {
-        if (cancelled) return
-        if (pages[0]) setPageId(pages[0].id)
-        else tryNextDocument()
+        if (cancelled) return;
+        if (pages[0]) setPageId(pages[0].id);
+        else tryNextDocument();
       })
-      .catch(() => !cancelled && tryNextDocument())
+      .catch(() => !cancelled && tryNextDocument());
 
     return () => {
-      cancelled = true
-    }
-  }, [currentDocumentId])
+      cancelled = true;
+    };
+  }, [currentDocumentId]);
 
   const frame = `flex items-center justify-center overflow-hidden border border-[#e0e6e0] bg-[#eef3ef] ${className}`;
 

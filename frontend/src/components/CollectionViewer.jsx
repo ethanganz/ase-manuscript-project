@@ -1,16 +1,31 @@
 import "leaflet/dist/leaflet.css";
 import {
-  ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Expand, FileText, Flag, MapPin,
-  Maximize2, Minimize2, Shrink, ZoomIn, ZoomOut,
-} from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { CircleMarker, MapContainer, TileLayer, Tooltip } from 'react-leaflet'
-import { getDocuments, getPages } from '../api/documents.js'
-import { pageImageUrl } from '../api/map.js'
-import { getMockPlaces, getMockTranscription } from '../data/mockTranscriptions.js'
-import { countryDisplayName } from '../libraray/countries.js'
-import { useFetch } from '../libraray/useFetch.js'
-import { ReportCollectionModal } from './ReportCollectionModal.jsx'
+  ArrowLeft,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  Expand,
+  FileText,
+  Flag,
+  MapPin,
+  Maximize2,
+  Minimize2,
+  Shrink,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
+import { getDocuments, getPages } from "../api/documents.js";
+import { pageImageUrl } from "../api/map.js";
+import {
+  getMockPlaces,
+  getMockTranscription,
+} from "../data/mockTranscriptions.js";
+import { countryDisplayName } from "../libraray/countries.js";
+import { useFetch } from "../libraray/useFetch.js";
+import { ReportCollectionModal } from "./ReportCollectionModal.jsx";
 
 // On large screens the viewer fills the window below the 76px header (minus
 // the 2rem App padding), so page and transcription show without scrolling.
@@ -373,9 +388,15 @@ function PlacesBar({ places, mapKey }) {
  * transcription on the right, with the places it mentions in a bar below.
  * Everything fits in the window; one panel or the whole viewer can be maximized.
  */
-export function CollectionViewer({ collectionId, collections, isLoadingCollections, user, onLogin }) {
-  const [isReporting, setIsReporting] = useState(false)
-  const [pickedDocumentId, setPickedDocumentId] = useState('')
+export function CollectionViewer({
+  collectionId,
+  collections,
+  isLoadingCollections,
+  user,
+  onLogin,
+}) {
+  const [isReporting, setIsReporting] = useState(false);
+  const [pickedDocumentId, setPickedDocumentId] = useState("");
   // Page shown per document, so switching documents keeps your place in each.
   const [pageIndexByDocument, setPageIndexByDocument] = useState({});
   const [focus, setFocus] = useState("both"); // 'both' | 'page' | 'text'
@@ -553,7 +574,10 @@ export function CollectionViewer({ collectionId, collections, isLoadingCollectio
       )}
 
       {isReporting && collection && (
-        <ReportCollectionModal collection={collection} onClose={() => setIsReporting(false)} />
+        <ReportCollectionModal
+          collection={collection}
+          onClose={() => setIsReporting(false)}
+        />
       )}
     </div>
   );

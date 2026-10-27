@@ -1,42 +1,42 @@
-import { MailCheck, X } from 'lucide-react'
-import { useState } from 'react'
-import { login, register, resendVerification } from '../api/auth.js'
+import { MailCheck, X } from "lucide-react";
+import { useState } from "react";
+import { login, register, resendVerification } from "../api/auth.js";
 
 const inputClass =
   "mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]";
 
 /** Sends a new verification email to `email` and shows when it is on its way. */
 function ResendButton({ email }) {
-  const [state, setState] = useState('idle') // idle | sending | sent | failed
+  const [state, setState] = useState("idle"); // idle | sending | sent | failed
 
   async function handleClick() {
-    setState('sending')
+    setState("sending");
     try {
-      await resendVerification(email)
-      setState('sent')
+      await resendVerification(email);
+      setState("sent");
     } catch {
-      setState('failed')
+      setState("failed");
     }
   }
 
-  if (state === 'sent') {
-    return <p className="text-sm text-[#476d5b]">A new link is on its way.</p>
+  if (state === "sent") {
+    return <p className="text-sm text-[#476d5b]">A new link is on its way.</p>;
   }
 
   return (
     <button
       type="button"
       onClick={handleClick}
-      disabled={state === 'sending'}
+      disabled={state === "sending"}
       className="text-sm font-medium text-[#476d5b] hover:underline disabled:opacity-60"
     >
-      {state === 'sending'
-        ? 'Sending…'
-        : state === 'failed'
-          ? 'Could not send. Try again'
-          : 'Send the verification email again'}
+      {state === "sending"
+        ? "Sending…"
+        : state === "failed"
+          ? "Could not send. Try again"
+          : "Send the verification email again"}
     </button>
-  )
+  );
 }
 
 /**
@@ -45,59 +45,64 @@ function ResendButton({ email }) {
  * verification email.
  */
 export function AuthModal({ isOpen, onAuthenticated, onClose }) {
-  const [mode, setMode] = useState('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
   // Set when the email still has to be verified: after sign-up, or a login
   // refused because the link was not opened yet.
-  const [unverifiedEmail, setUnverifiedEmail] = useState('')
-  const [justRegistered, setJustRegistered] = useState(false)
+  const [unverifiedEmail, setUnverifiedEmail] = useState("");
+  const [justRegistered, setJustRegistered] = useState(false);
 
   const isRegister = mode === "register";
 
   async function handleSubmit(event) {
-    event.preventDefault()
-    setSubmitting(true)
-    setError('')
-    setUnverifiedEmail('')
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    setUnverifiedEmail("");
     try {
       if (isRegister) {
-        const user = await register(firstName.trim(), lastName.trim(), email.trim(), password)
-        setUnverifiedEmail(user.email)
-        setJustRegistered(true)
-        setPassword('')
+        const user = await register(
+          firstName.trim(),
+          lastName.trim(),
+          email.trim(),
+          password,
+        );
+        setUnverifiedEmail(user.email);
+        setJustRegistered(true);
+        setPassword("");
       } else {
-        onAuthenticated(await login(email.trim(), password))
+        onAuthenticated(await login(email.trim(), password));
       }
     } catch (err) {
-      setError(err.message)
-      if (err.status === 403) setUnverifiedEmail(email.trim())
+      setError(err.message);
+      if (err.status === 403) setUnverifiedEmail(email.trim());
     } finally {
       setSubmitting(false);
     }
   }
 
   function switchMode() {
-    setMode(isRegister ? 'login' : 'register')
-    setError('')
-    setUnverifiedEmail('')
+    setMode(isRegister ? "login" : "register");
+    setError("");
+    setUnverifiedEmail("");
   }
 
   function handleClose() {
-    setJustRegistered(false)
-    setUnverifiedEmail('')
-    setError('')
-    onClose()
+    setJustRegistered(false);
+    setUnverifiedEmail("");
+    setError("");
+    onClose();
   }
 
   function backToLogin() {
-    setJustRegistered(false)
-    setUnverifiedEmail('')
-    setMode('login')
+    setJustRegistered(false);
+    setUnverifiedEmail("");
+    setMode("login");
   }
 
   if (!isOpen) return null;
@@ -107,7 +112,11 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
       <div className="w-full max-w-sm rounded-xl border border-[#dfe5df] bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <h2 className="font-serif text-2xl tracking-[-0.03em] text-[#1e302b]">
-            {justRegistered ? 'Check your email' : isRegister ? 'Create an account' : 'Log in'}
+            {justRegistered
+              ? "Check your email"
+              : isRegister
+                ? "Create an account"
+                : "Log in"}
           </h2>
           <button
             type="button"
@@ -123,10 +132,14 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
           <div className="mt-4 space-y-4 text-sm text-[#55615b]">
             <MailCheck className="size-10 text-[#6f8e7b]" />
             <p>
-              We sent a verification link to <strong className="text-[#1e302b]">{unverifiedEmail}</strong>.
-              Open it to finish creating your account. You will be logged in automatically.
+              We sent a verification link to{" "}
+              <strong className="text-[#1e302b]">{unverifiedEmail}</strong>.
+              Open it to finish creating your account. You will be logged in
+              automatically.
             </p>
-            <p className="text-xs text-[#8a9790]">Can't find it? Check your spam folder.</p>
+            <p className="text-xs text-[#8a9790]">
+              Can't find it? Check your spam folder.
+            </p>
             <ResendButton key={unverifiedEmail} email={unverifiedEmail} />
             <button
               type="button"
@@ -139,7 +152,9 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
         ) : (
           <>
             <p className="mt-1 text-sm text-[#7e8b85]">
-              {isRegister ? 'An account lets you create collections and upload documents.' : 'Welcome back to the archive.'}
+              {isRegister
+                ? "An account lets you create collections and upload documents."
+                : "Welcome back to the archive."}
             </p>
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -196,18 +211,29 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
                   onChange={(event) => setPassword(event.target.value)}
                   disabled={submitting}
                   className={inputClass}
-                  autoComplete={isRegister ? 'new-password' : 'current-password'}
+                  autoComplete={
+                    isRegister ? "new-password" : "current-password"
+                  }
                   minLength={isRegister ? 8 : undefined}
                   maxLength={72}
                   required
                 />
-                {isRegister && <span className="mt-1 block text-xs font-normal text-[#8a9790]">At least 8 characters.</span>}
+                {isRegister && (
+                  <span className="mt-1 block text-xs font-normal text-[#8a9790]">
+                    At least 8 characters.
+                  </span>
+                )}
               </label>
 
               {error && (
                 <div className="space-y-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                   <p>{error}</p>
-                  {unverifiedEmail && <ResendButton key={unverifiedEmail} email={unverifiedEmail} />}
+                  {unverifiedEmail && (
+                    <ResendButton
+                      key={unverifiedEmail}
+                      email={unverifiedEmail}
+                    />
+                  )}
                 </div>
               )}
 
@@ -216,14 +242,22 @@ export function AuthModal({ isOpen, onAuthenticated, onClose }) {
                 disabled={submitting}
                 className="w-full rounded-lg bg-[#1e3b35] px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {submitting ? 'Please wait…' : isRegister ? 'Create account' : 'Log in'}
+                {submitting
+                  ? "Please wait…"
+                  : isRegister
+                    ? "Create account"
+                    : "Log in"}
               </button>
             </form>
 
             <p className="mt-5 text-center text-sm text-[#6e7975]">
-              {isRegister ? 'Already have an account?' : 'New here?'}{' '}
-              <button type="button" onClick={switchMode} className="font-medium text-[#476d5b] hover:underline">
-                {isRegister ? 'Log in' : 'Create an account'}
+              {isRegister ? "Already have an account?" : "New here?"}{" "}
+              <button
+                type="button"
+                onClick={switchMode}
+                className="font-medium text-[#476d5b] hover:underline"
+              >
+                {isRegister ? "Log in" : "Create an account"}
               </button>
             </p>
           </>
