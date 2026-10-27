@@ -58,7 +58,18 @@ class UserOut(BaseModel):
     email: str
     first_name: Optional[str] = None   # "First Last"
     last_name: Optional[str] = None   # "First Last"
+    email_verified: bool = False
     created_at: Optional[datetime] = None
+
+
+# Request model for opening the link in the verification email.
+class VerifyEmail(BaseModel):
+    token: str = Field(min_length=1, max_length=2000)
+
+
+# Request model for asking for a new verification email.
+class ResendVerification(BaseModel):
+    email: Email
 
 
 # Request model for creating a new collection.
@@ -82,6 +93,26 @@ class CollectionOut(BaseModel):
     owner_id: Optional[UUID] = None   # None for collections made before accounts existed
     is_public: bool = True
     created_at: Optional[datetime] = None
+
+
+ReportReason = Literal["spam", "inappropriate", "copyright", "misleading", "other"]
+
+
+# Request model for reporting a collection.
+class ReportCreate(BaseModel):
+    reason: ReportReason
+    details: Optional[str] = Field(default=None, max_length=1000)
+
+
+# A report on one of the user's own collections. Never says who reported it.
+class ReceivedReportOut(BaseModel):
+    id: UUID
+    collection_id: UUID
+    collection_name: str
+    reason: ReportReason
+    details: Optional[str] = None
+    created_at: Optional[datetime] = None
+    read: bool
 
 
 # Response model for returning document metadata.

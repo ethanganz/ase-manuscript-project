@@ -1,4 +1,6 @@
-export function Header({ user, onLogin, onLogout }) {
+import { Bell } from 'lucide-react'
+
+export function Header({ user, unreadCount = 0, onLogin, onLogout }) {
   return (
     <header className="sticky top-0 z-20 border-b border-[#dfe5df] bg-[#fbfcfa]/95 backdrop-blur">
       <div className="mx-auto flex h-[76px] max-w-[1240px] items-center justify-between px-6 lg:px-8">
@@ -13,6 +15,19 @@ export function Header({ user, onLogin, onLogout }) {
         </nav>
 
         <div className="flex items-center gap-3">
+          {user && unreadCount > 0 && (
+            <a
+              href="#notifications"
+              className="relative rounded-full p-2 text-[#476d5b] transition-colors hover:bg-[#edf1ed]"
+              title={`${unreadCount} new ${unreadCount === 1 ? 'notification' : 'notifications'}`}
+              aria-label={`${unreadCount} new ${unreadCount === 1 ? 'notification' : 'notifications'}`}
+            >
+              <Bell className="size-5" />
+              <span className="absolute -right-0.5 -top-0.5 flex size-[18px] items-center justify-center rounded-full bg-[#a04a3a] text-[10px] font-semibold text-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            </a>
+          )}
           {user && (
             <a
               href="#profile"

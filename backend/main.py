@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes import documents, names
 from routes import map as map_routes
 
-from routes import auth, collections, documents, names
+from routes import auth, collections, documents, names, reports
 
 app = FastAPI(title="ASE Manuscript Project")
 
@@ -27,3 +27,4 @@ app.include_router(names.router)
 app.include_router(collections.router)
 app.include_router(documents.router)
 app.include_router(map_routes.router)
+app.include_router(reports.router)

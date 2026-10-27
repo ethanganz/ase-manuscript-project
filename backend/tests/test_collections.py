@@ -1,4 +1,4 @@
-from tests.conftest import register
+from tests.conftest import register_verified
 
 
 def test_create_and_list_collection(client):
@@ -52,7 +52,7 @@ def test_only_the_owner_can_edit(client, collection):
     client.post("/api/auth/logout")
     assert client.patch(url, json={"name": "Hijacked"}).status_code == 401
 
-    register(client, email="bob@example.com")
+    register_verified(client, email="bob@example.com")
     assert client.patch(url, json={"name": "Hijacked"}).status_code == 403
     assert client.get(url).json()["name"] == "Test letters"
 

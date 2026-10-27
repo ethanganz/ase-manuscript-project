@@ -10,6 +10,10 @@ import config
 
 ALGORITHM = "HS256"
 
+# Marks a token as an email-verification link, so it cannot be used as a
+# login token (and a login token cannot verify an email).
+VERIFY_EMAIL_PURPOSE = "verify_email"
+
 # bcrypt only looks at the first 72 bytes of a password.
 MAX_PASSWORD_BYTES = 72
 
@@ -45,4 +49,28 @@ def decode_token(token: str) -> Optional[str]:
         payload = jwt.decode(token, config.JWT_SECRET, algorithms=[ALGORITHM])
     except jwt.InvalidTokenError:
         return None
+    if "purpose" in payload:  # e.g. an email-verification link
+        return None
     return payload.get("sub")
+
+
+def create_email_token(user_id: str, email: str) -> str:
+    """Return a signed token for the link in the verification email.
+
+    The email is included so the link stops working if the address changes.
+    """
+    now = datetime.now(timezone.utc)
+    payload = {"sub": user_id, "email": email, "purpose": VERIFY_EMAIL_PURPOSE,
+               "iat": now, "exp": now + timedelta(hours=config.EMAIL_VERIFY_EXPIRE_HOURS)}
+    return jwt.encode(payload, config.JWT_SECRET, algorithm=ALGORITHM)
+
+
+def decode_email_token(token: str) -> Optional[tuple[str, str]]:
+    """Return (user ID, email) from a verification token, or None if invalid or expired."""
+    try:
+        payload = jwt.decode(token, config.JWT_SECRET, algorithms=[ALGORITHM])
+    except jwt.InvalidTokenError:
+        return None
+    if payload.get("purpose") != VERIFY_EMAIL_PURPOSE:
+        return None
+    return payload.get("sub"), payload.get("email")

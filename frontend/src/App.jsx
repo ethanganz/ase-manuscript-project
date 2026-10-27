@@ -1,3 +1,4 @@
+import { X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { CollectionSection } from './components/CollectionSection.jsx'
 import { CreateCollectionModal } from './components/CreateCollectionModal.jsx'
@@ -7,7 +8,8 @@ import { Hero } from './components/Hero.jsx'
 // import { ResearchSection } from './components/ResearchSection.jsx'
 // import { collections as sampleCollections, places } from './data/collections.js'
 import { createCollection, getCollections, uploadDocument, uploadFiles } from './api/documents.js'
-import { SESSION_ENDED_EVENT, getCurrentUser, logout } from './api/auth.js'
+import { SESSION_ENDED_EVENT, getCurrentUser, logout, verifyEmail } from './api/auth.js'
+import { getReceivedReports, markReportsRead } from './api/reports.js'
 import { AuthModal } from './components/AuthModal.jsx'
 
 import { MapSection } from './components/MapSection.jsx'
@@ -15,16 +17,36 @@ import { ProfilePage } from './components/ProfilePage.jsx'
 import { CollectionViewer } from './components/CollectionViewer.jsx'
 
 const PROFILE_HASH = '#profile'
+// The notifications section on the profile page; the header bell links here.
+const NOTIFICATIONS_HASH = '#notifications'
 const COLLECTION_HASH_PREFIX = '#collection/'
+
+// The link in the verification email opens the app at #verify-email/<token>.
+// Read once when the page loads, so it is only sent to the backend once.
+const VERIFY_EMAIL_HASH_PREFIX = '#verify-email/'
+const verifyEmailToken = window.location.hash.startsWith(VERIFY_EMAIL_HASH_PREFIX)
+  ? window.location.hash.slice(VERIFY_EMAIL_HASH_PREFIX.length)
+  : ''
+if (verifyEmailToken) {
+  // Keep the token out of the address bar and browser history.
+  window.history.replaceState(null, '', window.location.pathname + window.location.search)
+}
 
 function App() {
   const [user, setUser] = useState(null)
   const [hash, setHash] = useState(window.location.hash)
-  const isProfileOpen = hash === PROFILE_HASH
+  const isProfileOpen = hash === PROFILE_HASH || hash === NOTIFICATIONS_HASH
   const openCollectionId = hash.startsWith(COLLECTION_HASH_PREFIX)
     ? hash.slice(COLLECTION_HASH_PREFIX.length)
     : ''
   const [isAuthOpen, setIsAuthOpen] = useState(false)
+  // A message shown under the header, e.g. after opening the verification link.
+  const [notice, setNotice] = useState(null) // { type: 'success' | 'error', text }
+  // Reports on the user's own collections, shown as notifications. Kept with
+  // the user they were loaded for, so another account never sees them.
+  const [reportsState, setReportsState] = useState({ userId: null, reports: [] })
+  const receivedReports = user && reportsState.userId === user.id ? reportsState.reports : []
+  const unreadReportCount = receivedReports.filter((report) => !report.read).length
   const [search, setSearch] = useState('')
   const [remoteCollections, setRemoteCollections] = useState([])
   const [selectedCollection, setSelectedCollection] = useState('')
@@ -42,9 +64,23 @@ function App() {
   const [loadingCollections, setLoadingCollections] = useState(true)
 
   useEffect(() => {
-    getCurrentUser()
-      .then(setUser)
-      .catch(() => setUser(null))
+    if (verifyEmailToken) {
+      // Opening the link verifies the email and logs in.
+      verifyEmail(verifyEmailToken)
+        .then((verifiedUser) => {
+          setUser(verifiedUser)
+          setNotice({ type: 'success', text: 'Your email is verified. Welcome! You are now logged in.' })
+        })
+        .catch((err) => {
+          setNotice({ type: 'error', text: `${err.message}. Log in to get a new link.` })
+          return getCurrentUser().then(setUser)
+        })
+        .catch(() => setUser(null))
+    } else {
+      getCurrentUser()
+        .then(setUser)
+        .catch(() => setUser(null))
+    }
 
     // Any API call answering 401 means the login expired.
     const onSessionEnded = () => setUser(null)
@@ -52,8 +88,8 @@ function App() {
     return () => window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded)
   }, [])
 
-  // The profile page lives at #profile and a collection at #collection/<id>;
-  // any other hash shows the archive.
+  // The profile page lives at #profile (or #notifications, scrolled to that
+  // section) and a collection at #collection/<id>; any other hash shows the archive.
   useEffect(() => {
     const onHashChange = () => {
       const { hash: newHash } = window.location
@@ -61,7 +97,7 @@ function App() {
       if (newHash === PROFILE_HASH || newHash.startsWith(COLLECTION_HASH_PREFIX)) {
         window.scrollTo(0, 0)
       } else {
-        // The section only exists after the archive renders again.
+        // The section only exists after the archive or profile renders again.
         requestAnimationFrame(() => {
           const target = window.location.hash && document.querySelector(window.location.hash)
           target?.scrollIntoView()
@@ -71,6 +107,26 @@ function App() {
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
+
+  // Load the notifications when someone logs in.
+  useEffect(() => {
+    if (!user?.id) return
+    let cancelled = false
+    getReceivedReports()
+      .then((reports) => !cancelled && setReportsState({ userId: user.id, reports }))
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id])
+
+  async function handleMarkReportsRead() {
+    await markReportsRead()
+    setReportsState((previous) => ({
+      ...previous,
+      reports: previous.reports.map((report) => ({ ...report, read: true })),
+    }))
+  }
 
   async function handleLogout() {
     await logout()
@@ -211,7 +267,28 @@ function App() {
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] text-[#1e2a27]">
-      <Header user={user} onLogin={() => setIsAuthOpen(true)} onLogout={handleLogout} />
+      <Header
+        user={user}
+        unreadCount={unreadReportCount}
+        onLogin={() => setIsAuthOpen(true)}
+        onLogout={handleLogout}
+      />
+
+      {notice && (
+        <div
+          role="status"
+          className={`mx-auto mt-4 flex max-w-[1120px] items-start justify-between gap-4 rounded-lg border px-4 py-3 text-sm ${
+            notice.type === 'success'
+              ? 'border-[#c3d2c7] bg-[#eef3ef] text-[#1e3b35]'
+              : 'border-red-200 bg-red-50 text-red-700'
+          }`}
+        >
+          <p>{notice.text}</p>
+          <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className="shrink-0 hover:opacity-70">
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
 
       {/* The collection viewer is a full-height workspace: wider, with less padding. */}
       <div
@@ -228,6 +305,8 @@ function App() {
             collectionId={openCollectionId}
             collections={remoteCollections}
             isLoadingCollections={loadingCollections}
+            user={user}
+            onLogin={() => setIsAuthOpen(true)}
           />
         ) : isProfileOpen ? (
           <ProfilePage
@@ -235,6 +314,8 @@ function App() {
             collections={remoteCollections}
             isLoading={loadingCollections}
             onLogin={() => setIsAuthOpen(true)}
+            reports={receivedReports}
+            onMarkReportsRead={handleMarkReportsRead}
             onCreateCollection={openCollectionModal}
             onCollectionUpdated={(updated) =>
               setRemoteCollections((previous) =>
