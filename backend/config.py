@@ -56,3 +56,11 @@ MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", "500"))
 
 # PDF pages are rendered at 200 DPI
 PDF_RENDER_DPI = int(os.getenv("PDF_RENDER_DPI", "200"))
+
+# --- Handwriting recognition (htr/service) --------------------------------
+# Base URL of the HTR service, e.g. http://htr:8000 in docker-compose.
+# Empty = pages are stored but not transcribed.
+HTR_SERVICE_URL = os.getenv("HTR_SERVICE_URL", "").rstrip("/")
+
+# One page can take minutes on CPU (8-beam decoding of every line).
+HTR_TIMEOUT_SECONDS = float(os.getenv("HTR_TIMEOUT_SECONDS", "900"))

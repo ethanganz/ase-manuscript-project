@@ -12,6 +12,9 @@ from uuid import uuid4
 
 from database.paging import fetch_all
 
+# Everything but the transcription, which can be large; it is read one page at a time.
+PAGE_LIST_COLUMNS = "id,document_id,page_number,image_path,width,height,status"
+
 
 class Repository:
     """Common interface for data access."""
@@ -38,6 +41,7 @@ class Repository:
     def create_pages(self, pages: list[dict]) -> None: ...
     def get_page(self, page_id: str) -> dict | None: ...
     def list_pages(self, document_id: str) -> list[dict]: ...
+    def update_page(self, page_id: str, fields: dict) -> None: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
     def create_report(
@@ -168,6 +172,11 @@ class InMemoryRepository(Repository):
         """Return pages belonging to a document."""
         rows = [dict(p) for p in self.pages.values() if p["document_id"] == document_id]
         return sorted(rows, key=lambda p: p["page_number"])
+
+    def update_page(self, page_id, fields):
+        """Change some fields of a page."""
+        if page_id in self.pages:
+            self.pages[page_id].update(fields)
 
     def list_mention_details(self, collection_id):
         return [dict(r) for r in self.mention_details if r["collection_id"] == collection_id]
@@ -328,12 +337,16 @@ class SupabaseRepository(Repository):
         """Return pages belonging to a document."""
         res = (
             self._t("pages")
-            .select("*")
+            .select(PAGE_LIST_COLUMNS)
             .eq("document_id", document_id)
             .order("page_number")
             .execute()
         )
         return res.data or []
+
+    def update_page(self, page_id, fields):
+        """Change some fields of a page."""
+        self._t("pages").update(fields).eq("id", page_id).execute()
 
     def list_mention_details(self, collection_id):
         # order() gives a stable order, which paging needs to avoid skipping rows.

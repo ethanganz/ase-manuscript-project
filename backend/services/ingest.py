@@ -179,6 +179,7 @@ def _ingest_single(
     src: Path,
     kind: str,
     source_archive: str | None = None,
+    language: str | None = None,
 ) -> FileOutcome:
     document_id = str(uuid4())
     prefix = f"collections/{collection_id}/documents/{document_id}"
@@ -214,19 +215,20 @@ def _ingest_single(
                     }
                 )
 
-            repo.create_document(
-                {
-                    "id": document_id,
-                    "collection_id": collection_id,
-                    "original_filename": safe_filename(filename),
-                    "source_archive": safe_filename(source_archive) if source_archive else None,
-                    "file_type": kind,
-                    "size_bytes": src.stat().st_size,
-                    "sha256": _sha256(src),
-                    "status": "uploaded",
-                    "original_path": original_key,
-                }
-            )
+            doc = {
+                "id": document_id,
+                "collection_id": collection_id,
+                "original_filename": safe_filename(filename),
+                "source_archive": safe_filename(source_archive) if source_archive else None,
+                "file_type": kind,
+                "size_bytes": src.stat().st_size,
+                "sha256": _sha256(src),
+                "status": "uploaded",
+                "original_path": original_key,
+            }
+            if language:  # only sent when chosen, so the column is optional
+                doc["language"] = language
+            repo.create_document(doc)
             doc_created = True
             repo.create_pages(page_rows)
             return FileOutcome(filename, True, document_id, len(pages))
@@ -276,6 +278,7 @@ def _ingest_zip(
     collection_id: str,
     filename: str,
     src: Path,
+    language: str | None = None,
 ) -> list[FileOutcome]:
     try:
         zf = zipfile.ZipFile(src)
@@ -325,6 +328,7 @@ def _ingest_zip(
                         member,
                         kind,
                         source_archive=filename,
+                        language=language,
                     )
                     out.filename = label
                     outcomes.append(out)
@@ -344,9 +348,10 @@ def ingest_upload(
     collection_id: str,
     filename: str,
     stream: BinaryIO,
+    language: str | None = None,
 ) -> list[FileOutcome]:
     """Process one uploaded file. Returns one outcome per resulting document
-    (a ZIP yields one outcome per file inside it)."""
+    (a ZIP yields one outcome per file inside it). `language` is "de", "la" or None."""
     filename = safe_filename(filename)
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "upload"
@@ -367,8 +372,10 @@ def ingest_upload(
                 )
             ]
         if kind == "zip":
-            return _ingest_zip(repo, storage, collection_id, filename, src)
+            return _ingest_zip(repo, storage, collection_id, filename, src, language)
         try:
-            return [_ingest_single(repo, storage, collection_id, filename, src, kind)]
+            return [
+                _ingest_single(repo, storage, collection_id, filename, src, kind, language=language)
+            ]
         except IngestError as exc:
             return [FileOutcome(filename, False, error=str(exc))]

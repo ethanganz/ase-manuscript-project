@@ -18,6 +18,8 @@ export function CreateCollectionModal({
   isPublic,
   onIsPublicChange,
   selectedFiles,
+  language,
+  onLanguageChange,
   submitting,
   error,
   onNameChange,
@@ -193,6 +195,24 @@ export function CreateCollectionModal({
               }
               className="mt-2 block w-full rounded-lg border border-dashed border-[#cbd8cc] bg-[#fbfcfa] px-3 py-2.5 text-sm file:mr-4 file:rounded file:border-0 file:bg-[#1e3b35] file:px-3 file:py-2 file:text-white disabled:cursor-not-allowed disabled:opacity-60"
             />
+          </label>
+
+          <label className="block text-sm font-medium text-[#374b45]">
+            Handwriting language
+            <select
+              value={language}
+              onChange={(event) => onLanguageChange(event.target.value)}
+              disabled={submitting}
+              className="mt-2 w-full rounded-lg border border-[#dfe5df] bg-white px-3 py-2.5 outline-none focus:border-[#6f8e7b] disabled:cursor-not-allowed disabled:bg-[#f4f6f4]"
+            >
+              <option value="unknown">Unknown or mixed</option>
+              <option value="de">German</option>
+              <option value="la">Latin</option>
+            </select>
+            <span className="mt-1 block text-xs font-normal text-[#7e8b85]">
+              Used to improve text recognition. The text appears in the viewer a
+              few minutes after upload.
+            </span>
           </label>
 
           {selectedFiles.length > 0 && (

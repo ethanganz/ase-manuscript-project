@@ -5,6 +5,7 @@ import config
 from database.repository import Repository, SupabaseRepository
 from services.auth import decode_token
 from services.email import EmailSender, ResendEmailSender
+from services.htr import HtrClient, HttpHtrClient
 from services.storage import ObjectStorage, SupabaseStorage
 
 # Reads the login cookie. Also shows the lock icon in the API docs.
@@ -24,6 +25,13 @@ def get_storage() -> ObjectStorage:
 def get_mailer() -> EmailSender:
     """FastAPI dependency. Tests override this with an in-memory outbox."""
     return ResendEmailSender()
+
+
+def get_htr() -> HtrClient | None:
+    """FastAPI dependency. None when no HTR service is configured. Tests use a fake."""
+    if not config.HTR_SERVICE_URL:
+        return None
+    return HttpHtrClient(config.HTR_SERVICE_URL, config.HTR_TIMEOUT_SECONDS)
 
 
 def get_optional_user(
