@@ -24,7 +24,9 @@ async function postJson(url, body) {
     const detail = Array.isArray(data.detail)
       ? data.detail[0]?.msg
       : data.detail;
-    throw new Error(detail || `Request failed (${response.status})`);
+    const error = new Error(detail || `Request failed (${response.status})`);
+    error.status = response.status;
+    throw error;
   }
   return data;
 }
@@ -37,10 +39,12 @@ export async function getCurrentUser() {
   return response.json();
 }
 
+/** Throws an error with status 403 if the email is not verified yet. */
 export function login(email, password) {
   return postJson("/api/auth/login", { email, password });
 }
 
+/** Creates the account and emails a verification link. Does not log in. */
 export function register(firstName, lastName, email, password) {
   return postJson("/api/auth/register", {
     first_name: firstName,
@@ -48,6 +52,16 @@ export function register(firstName, lastName, email, password) {
     email,
     password,
   });
+}
+
+/** Confirms the email with the token from the link, and logs in. */
+export function verifyEmail(token) {
+  return postJson("/api/auth/verify-email", { token });
+}
+
+/** Asks for a new verification email. Answers the same whether or not the account exists. */
+export function resendVerification(email) {
+  return postJson("/api/auth/resend-verification", { email });
 }
 
 export async function logout() {

@@ -17,21 +17,14 @@ class Repository:
     """Common interface for data access."""
 
     def create_user(
-        self,
-        email: str,
-        password_hash: str,
-        first_name: str | None,
-        last_name: str | None,
+        self, email: str, password_hash: str, first_name: str | None, last_name: str | None
     ) -> dict: ...
     def get_user(self, user_id: str) -> dict | None: ...
     def get_user_by_email(self, email: str) -> dict | None: ...
+    def mark_email_verified(self, user_id: str) -> dict | None: ...
 
     def create_collection(
-        self,
-        name: str,
-        description: str | None,
-        owner_id: str,
-        is_public: bool = True,
+        self, name: str, description: str | None, owner_id: str, is_public: bool = True
     ) -> dict: ...
     def list_collections(self) -> list[dict]: ...
     def get_collection(self, collection_id: str) -> dict | None: ...
@@ -47,6 +40,13 @@ class Repository:
     def list_pages(self, document_id: str) -> list[dict]: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
+    def create_report(
+        self, collection_id: str, reporter_id: str, reason: str, details: str | None
+    ) -> dict: ...
+    def has_reported(self, collection_id: str, reporter_id: str) -> bool: ...
+    def list_reports_for_collections(self, collection_ids: list[str]) -> list[dict]: ...
+    def mark_reports_read(self, collection_ids: list[str]) -> None: ...
+
 
 class InMemoryRepository(Repository):
     """In-memory repository used for tests."""
@@ -57,6 +57,7 @@ class InMemoryRepository(Repository):
         self.documents: dict[str, dict] = {}
         self.pages: dict[str, dict] = {}
         self.mention_details: list[dict] = []  # tests put rows here
+        self.reports: dict[str, dict] = {}
 
     @staticmethod
     def _now() -> str:
@@ -72,6 +73,8 @@ class InMemoryRepository(Repository):
             "first_name": first_name,
             "last_name": last_name,
             "created_at": self._now(),
+            "email_verified": False,
+            "email_verified_at": None,
         }
         self.users[row["id"]] = row
         return dict(row)
@@ -85,6 +88,14 @@ class InMemoryRepository(Repository):
         """Return a user by email."""
         row = next((u for u in self.users.values() if u["email"] == email), None)
         return dict(row) if row else None
+
+    def mark_email_verified(self, user_id):
+        """Mark the user's email as verified. Returns the new row, or None if missing."""
+        row = self.users.get(user_id)
+        if row is None:
+            return None
+        row.update(email_verified=True, email_verified_at=self._now())
+        return dict(row)
 
     def create_collection(self, name, description, owner_id, is_public=True):
         """Create and store a collection."""
@@ -161,6 +172,38 @@ class InMemoryRepository(Repository):
     def list_mention_details(self, collection_id):
         return [dict(r) for r in self.mention_details if r["collection_id"] == collection_id]
 
+    def create_report(self, collection_id, reporter_id, reason, details):
+        """Create and store a report."""
+        row = {
+            "id": str(uuid4()),
+            "collection_id": collection_id,
+            "reporter_id": reporter_id,
+            "reason": reason,
+            "details": details,
+            "read_at": None,
+            "created_at": self._now(),
+        }
+        self.reports[row["id"]] = row
+        return dict(row)
+
+    def has_reported(self, collection_id, reporter_id):
+        """Return True if this user already reported this collection."""
+        return any(
+            r["collection_id"] == collection_id and r["reporter_id"] == reporter_id
+            for r in self.reports.values()
+        )
+
+    def list_reports_for_collections(self, collection_ids):
+        """Return the reports on these collections, newest first."""
+        rows = [dict(r) for r in self.reports.values() if r["collection_id"] in collection_ids]
+        return sorted(rows, key=lambda r: r["created_at"], reverse=True)
+
+    def mark_reports_read(self, collection_ids):
+        """Mark every unread report on these collections as read."""
+        for r in self.reports.values():
+            if r["collection_id"] in collection_ids and r["read_at"] is None:
+                r["read_at"] = self._now()
+
 
 class SupabaseRepository(Repository):
     """Supabase-backed repository used in production."""
@@ -199,6 +242,21 @@ class SupabaseRepository(Repository):
     def get_user_by_email(self, email):
         """Return a user by email."""
         res = self._t("users").select("*").eq("email", email).limit(1).execute()
+        return res.data[0] if res.data else None
+
+    def mark_email_verified(self, user_id):
+        """Mark the user's email as verified. Returns the new row, or None if missing."""
+        res = (
+            self._t("users")
+            .update(
+                {
+                    "email_verified": True,
+                    "email_verified_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            .eq("id", user_id)
+            .execute()
+        )
         return res.data[0] if res.data else None
 
     def create_collection(self, name, description, owner_id, is_public=True):
@@ -287,3 +345,56 @@ class SupabaseRepository(Repository):
                 .order("mention_id")
             )
         )
+
+    def create_report(self, collection_id, reporter_id, reason, details):
+        """Create a report in Supabase."""
+        res = (
+            self._t("reports")
+            .insert(
+                {
+                    "collection_id": collection_id,
+                    "reporter_id": reporter_id,
+                    "reason": reason,
+                    "details": details,
+                }
+            )
+            .execute()
+        )
+        return res.data[0]
+
+    def has_reported(self, collection_id, reporter_id):
+        """Return True if this user already reported this collection."""
+        res = (
+            self._t("reports")
+            .select("id")
+            .eq("collection_id", collection_id)
+            .eq("reporter_id", reporter_id)
+            .limit(1)
+            .execute()
+        )
+        return bool(res.data)
+
+    def list_reports_for_collections(self, collection_ids):
+        """Return the reports on these collections, newest first."""
+        if not collection_ids:
+            return []
+        return fetch_all(
+            lambda: (
+                self._t("reports")
+                .select("*")
+                .in_("collection_id", collection_ids)
+                .order("created_at", desc=True)
+                .order("id")
+            )
+        )
+
+    def mark_reports_read(self, collection_ids):
+        """Mark every unread report on these collections as read."""
+        if collection_ids:
+            (
+                self._t("reports")
+                .update({"read_at": datetime.now(timezone.utc).isoformat()})
+                .in_("collection_id", collection_ids)
+                .is_("read_at", "null")
+                .execute()
+            )

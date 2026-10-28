@@ -1,7 +1,9 @@
 import {
   ArrowLeft,
+  Bell,
   CalendarDays,
   FileText,
+  Flag,
   FolderOpen,
   HardDrive,
   Lock,
@@ -11,8 +13,9 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getDocuments, updateCollection } from "../api/documents.js";
+import { reportReasonLabel } from "../api/reports.js";
 import { CollectionPreview, StatCard } from "../tools/helpers.jsx";
-import { formatDate, formatBytes } from "../tools/formatters.js";
+import { formatBytes, formatDate } from "../tools/formatters.js";
 
 // Columns of the "My collections" table. Below `sm` only preview, name, size and edit are shown.
 const TABLE_COLUMNS =
@@ -180,12 +183,110 @@ function OwnCollectionRow({ collection, documents, onCollectionUpdated }) {
   );
 }
 
-/** Dashboard for the logged-in user: account details and their own collections. */
+/** Reports other users made about the user's collections. Reporters stay anonymous. */
+function NotificationsSection({ reports, onMarkRead }) {
+  const [marking, setMarking] = useState(false);
+  const [error, setError] = useState("");
+  const unreadCount = reports.filter((report) => !report.read).length;
+
+  async function handleMarkRead() {
+    setMarking(true);
+    setError("");
+    try {
+      await onMarkRead();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setMarking(false);
+    }
+  }
+
+  return (
+    <section id="notifications" className="scroll-mt-24 pb-12">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-3 font-serif text-3xl tracking-[-0.04em]">
+            Notifications
+            {unreadCount > 0 && (
+              <span className="rounded-full bg-[#a04a3a] px-2 py-0.5 font-sans text-xs font-semibold tracking-normal text-white">
+                {unreadCount} new
+              </span>
+            )}
+          </h2>
+          <p className="mt-2 text-sm text-[#7e8b85]">
+            Reports other users made about your collections.
+          </p>
+        </div>
+        {unreadCount > 0 && (
+          <button
+            type="button"
+            onClick={handleMarkRead}
+            disabled={marking}
+            className="rounded-md border border-[#cbdace] px-3 py-1.5 text-xs font-medium text-[#476d5b] hover:bg-[#edf1ed] disabled:opacity-50"
+          >
+            {marking ? "Saving…" : "Mark all as read"}
+          </button>
+        )}
+      </div>
+      {error && <p className="mt-3 text-xs text-red-700">{error}</p>}
+
+      {reports.length === 0 ? (
+        <p className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-dashed border-[#cbdace] bg-white px-5 py-8 text-sm text-[#7e8b85]">
+          <Bell className="size-4" />
+          No notifications. Nobody has reported your collections.
+        </p>
+      ) : (
+        <ul className="mt-6 divide-y divide-[#edf0ed] overflow-hidden rounded-xl border border-[#e0e6e0] bg-white">
+          {reports.map((report) => (
+            <li
+              key={report.id}
+              className={`flex gap-4 px-4 py-4 ${report.read ? "" : "bg-[#fbf3f1]"}`}
+            >
+              <Flag
+                className={`mt-0.5 size-4 shrink-0 ${report.read ? "text-[#a3b3a9]" : "text-[#a04a3a]"}`}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-[#1e302b]">
+                  Your collection{" "}
+                  <a
+                    href={`#collection/${report.collection_id}`}
+                    className="font-medium hover:underline"
+                  >
+                    {report.collection_name}
+                  </a>{" "}
+                  was reported:{" "}
+                  <strong>{reportReasonLabel(report.reason)}</strong>
+                </p>
+                {report.details && (
+                  <p className="mt-1 whitespace-pre-line break-words text-sm text-[#55615b]">
+                    “{report.details}”
+                  </p>
+                )}
+                <p className="mt-1 text-xs text-[#8a9790]">
+                  {formatDate(report.created_at)}
+                </p>
+              </div>
+              {!report.read && (
+                <span className="h-fit shrink-0 rounded bg-[#a04a3a] px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+                  NEW
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Dashboard for the logged-in user: account details, notifications and their own collections. */
 export function ProfilePage({
   user,
   collections,
   isLoading,
+  reports = [],
   onLogin,
+  onMarkReportsRead,
   onCreateCollection,
   onCollectionUpdated,
 }) {
@@ -318,6 +419,8 @@ export function ProfilePage({
           value={documentsReady && !isLoading ? formatBytes(totalSize) : "…"}
         />
       </section>
+
+      <NotificationsSection reports={reports} onMarkRead={onMarkReportsRead} />
 
       <section className="pb-12">
         <h2 className="font-serif text-3xl tracking-[-0.04em]">

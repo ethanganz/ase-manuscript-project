@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Expand,
   FileText,
+  Flag,
   MapPin,
   Maximize2,
   Minimize2,
@@ -24,6 +25,7 @@ import {
 } from "../data/mockTranscriptions.js";
 import { countryDisplayName } from "../libraray/countries.js";
 import { useFetch } from "../libraray/useFetch.js";
+import { ReportCollectionModal } from "./ReportCollectionModal.jsx";
 
 // On large screens the viewer fills the window below the 76px header (minus
 // the 2rem App padding), so page and transcription show without scrolling.
@@ -390,7 +392,10 @@ export function CollectionViewer({
   collectionId,
   collections,
   isLoadingCollections,
+  user,
+  onLogin,
 }) {
+  const [isReporting, setIsReporting] = useState(false);
   const [pickedDocumentId, setPickedDocumentId] = useState("");
   // Page shown per document, so switching documents keeps your place in each.
   const [pageIndexByDocument, setPageIndexByDocument] = useState({});
@@ -489,6 +494,18 @@ export function CollectionViewer({
               ` · ${documents.length} ${documents.length === 1 ? "document" : "documents"}`}
           </p>
         </div>
+        {/* Anyone but the owner can report; visitors are asked to log in first. */}
+        {collection && collection.owner_id !== user?.id && (
+          <button
+            type="button"
+            onClick={() => (user ? setIsReporting(true) : onLogin())}
+            className="flex shrink-0 items-center gap-2 rounded-lg border border-[#dfe5df] bg-white px-3 py-1.5 text-sm text-[#55615b] transition-colors hover:border-[#e3c1b9] hover:bg-[#fbf3f1] hover:text-[#a04a3a]"
+            title="Report this collection"
+          >
+            <Flag className="size-4" />
+            <span className="hidden sm:inline">Report</span>
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setIsFullScreen((full) => !full)}
@@ -554,6 +571,13 @@ export function CollectionViewer({
 
           <PlacesBar places={places} mapKey={`${documentId}/${pageNumber}`} />
         </>
+      )}
+
+      {isReporting && collection && (
+        <ReportCollectionModal
+          collection={collection}
+          onClose={() => setIsReporting(false)}
+        />
       )}
     </div>
   );

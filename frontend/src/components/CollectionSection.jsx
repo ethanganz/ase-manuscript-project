@@ -1,4 +1,4 @@
-import { ArrowUpRight, Lock, MoreHorizontal, Search } from "lucide-react";
+import { ArrowUpRight, MoreHorizontal, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { CollectionPreview } from "../tools/helpers.jsx";
 
@@ -22,12 +22,6 @@ function CollectionCard({ collection }) {
             >
               {collection.name}
             </a>
-            {collection.is_public === false && (
-              <Lock
-                className="ml-1.5 inline size-3.5 align-baseline text-[#8a9790]"
-                aria-label="Private"
-              />
-            )}
           </h3>
           <p className="mt-1 text-xs text-[#8a9790]">
             {collection.description || "No description"}
@@ -73,8 +67,11 @@ export function CollectionSection({
 
   const filteredCollections = useMemo(
     () =>
-      collections.filter((collection) =>
-        collection.name.toLowerCase().includes(search.toLowerCase()),
+      collections.filter(
+        (collection) =>
+          // Private collections are never listed here, not even for their owner.
+          collection.is_public !== false &&
+          collection.name.toLowerCase().includes(search.toLowerCase()),
       ),
     [collections, search],
   );
