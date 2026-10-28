@@ -1,0 +1,6 @@
+# Downloaded models and caches (several GB) - fetch with scripts/download_*.py
+models/
+.cache/
+.venv*/
+outputs/
+__pycache__/
