@@ -38,6 +38,7 @@ class Repository:
     def create_pages(self, pages: list[dict]) -> None: ...
     def get_page(self, page_id: str) -> dict | None: ...
     def list_pages(self, document_id: str) -> list[dict]: ...
+    def upsert_text_lines(self, rows: list[dict]) -> None: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
     def create_report(
@@ -58,6 +59,7 @@ class InMemoryRepository(Repository):
         self.pages: dict[str, dict] = {}
         self.mention_details: list[dict] = []  # tests put rows here
         self.reports: dict[str, dict] = {}
+        self.text_lines: dict[str, dict] = {}  # keyed by source_line_id
 
     @staticmethod
     def _now() -> str:
@@ -203,6 +205,15 @@ class InMemoryRepository(Repository):
         for r in self.reports.values():
             if r["collection_id"] in collection_ids and r["read_at"] is None:
                 r["read_at"] = self._now()
+
+    def upsert_text_lines(self, rows):
+        for row in rows:
+            existing = self.text_lines.get(row["source_line_id"])
+            if existing:
+                existing.update(row)  # columns not in ``row`` (such as page_id) stay as they are
+            else:
+                self.text_lines[row["source_line_id"]] = {
+                    "id": str(uuid4()), "page_id": None, "created_at": self._now(), **row}
 
 
 class SupabaseRepository(Repository):
@@ -398,3 +409,9 @@ class SupabaseRepository(Repository):
                 .is_("read_at", "null")
                 .execute()
             )
+    def upsert_text_lines(self, rows):
+        # In chunks of 500, so one request never gets too large. Columns missing
+        # from a row are left unchanged when the line already exists.
+        for start in range(0, len(rows), 500):
+            self._t("text_lines").upsert(
+                rows[start:start + 500], on_conflict="source_line_id").execute()
