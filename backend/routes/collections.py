@@ -1,12 +1,14 @@
+from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
 from database.repository import Repository
 from deps import (
     can_view,
     get_current_user,
+    get_htr,
     get_optional_user,
     get_repo,
     get_storage,
@@ -20,6 +22,7 @@ from schemas import (
     FileResult,
     UploadReport,
 )
+from services.htr import HtrClient, queue_pages, transcribe_document
 from services.ingest import ingest_upload
 from services.storage import ObjectStorage
 
@@ -97,24 +100,30 @@ def list_documents(
 @router.post("/{collection_id}/uploads", response_model=UploadReport)
 def upload_files(
     collection_id: UUID,
+    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
+    language: Literal["de", "la", "unknown"] = Form("unknown"),
     repo: Repository = Depends(get_repo),
     storage: ObjectStorage = Depends(get_storage),
+    htr: HtrClient | None = Depends(get_htr),
     user: dict = Depends(get_current_user),
 ):
     """Bulk upload: PDF, JPG/JPEG, PNG, heic or ZIP of those. Multiple files allowed.
 
     Only the owner of the collection may upload. Returns a per-file report.
     Status 201 if at least one file was accepted, 422 if every file was rejected.
+    `language` (German / Latin) helps handwriting recognition; it runs after the
+    response, when an HTR service is configured.
     """
     collection = require_visible_collection(repo, str(collection_id), user)
     if collection.get("owner_id") != user["id"]:
         raise HTTPException(status_code=403, detail="You can only upload to your own collections")
 
+    lang = None if language == "unknown" else language
     results: list[FileResult] = []
     for upload in files:
         outcomes = ingest_upload(
-            repo, storage, str(collection_id), upload.filename or "unnamed", upload.file
+            repo, storage, str(collection_id), upload.filename or "unnamed", upload.file, lang
         )
 
         for o in outcomes:
@@ -128,6 +137,14 @@ def upload_files(
                 )
             )
 
+    if htr is not None:
+        for r in results:
+            if r.document_id:
+                queue_pages(repo, str(r.document_id))
+                background_tasks.add_task(
+                    transcribe_document, repo, storage, htr, str(r.document_id), lang
+                )
+
     accepted = sum(r.status == "accepted" for r in results)
     report = UploadReport(
         collection_id=collection_id,
@@ -136,5 +153,7 @@ def upload_files(
         results=results,
     )
     return JSONResponse(
-        status_code=201 if accepted else 422, content=report.model_dump(mode="json")
+        status_code=201 if accepted else 422,
+        content=report.model_dump(mode="json"),
+        background=background_tasks,
     )

@@ -125,6 +125,7 @@ class DocumentOut(BaseModel):
     size_bytes: int
     sha256: str
     status: str
+    language: str | None = None  # "de" | "la" | None (unknown)
     created_at: datetime | None = None
 
 
@@ -135,7 +136,37 @@ class PageOut(BaseModel):
     page_number: int
     width: int
     height: int
+    status: str  # pending | queued | processing | done | failed
+
+
+# A place the HTR service found in a line. `start`/`end` index into the line text.
+class PlaceSpan(BaseModel):
+    start: int
+    end: int
+    text: str
+    sources: list[str] = []
+    score: float | None = None
+    identities: list[dict] = []  # possible official places, with coordinates; unverified
+
+
+class TranscriptionLine(BaseModel):
+    text: str
+    bbox: list[int]  # left, top, right, bottom in page-image pixels
+    places: list[PlaceSpan] = []
+
+
+# Response model for the recognized text of one page.
+class PageTranscriptionOut(BaseModel):
+    page_id: UUID
     status: str
+    error: str | None = None
+    language: str | None = None
+    lines: list[TranscriptionLine] = []
+
+
+# Request model for running handwriting recognition again on a document.
+class TranscribeRequest(BaseModel):
+    language: Literal["de", "la", "unknown"] | None = None  # None = keep the document's
 
 
 # Result for a single uploaded file.

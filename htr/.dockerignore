@@ -1,0 +1,7 @@
+models/
+.cache/
+.venv*/
+outputs/
+examples/
+tests/
+**/__pycache__/

@@ -69,11 +69,13 @@ export async function updateCollection(collectionId, changes) {
   return data;
 }
 
-export async function uploadFiles(collectionId, files) {
+/** language: "de" | "la" | "unknown" — helps handwriting recognition. */
+export async function uploadFiles(collectionId, files, language = "unknown") {
   const formData = new FormData();
   for (const file of files) {
     formData.append("files", file); // same field name repeated = many files
   }
+  formData.append("language", language);
 
   const response = await apiFetch(`/api/collections/${collectionId}/uploads`, {
     method: "POST",
@@ -99,6 +101,36 @@ export async function uploadFiles(collectionId, files) {
       ? data.detail
       : `Upload failed (${response.status})`,
   );
+}
+
+/** Recognized lines of one page: { status, error, language, lines }. */
+export async function getPageTranscription(pageId) {
+  const response = await apiFetch(`/api/pages/${pageId}/transcription`);
+
+  if (!response.ok) {
+    throw new Error("Unable to load transcription");
+  }
+
+  return response.json();
+}
+
+/** Run handwriting recognition again on every page. Only the owner may do this. */
+export async function transcribeDocument(documentId) {
+  const response = await apiFetch(`/api/documents/${documentId}/transcribe`, {
+    method: "POST",
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      typeof data.detail === "string"
+        ? data.detail
+        : `Could not start transcription (${response.status})`,
+    );
+  }
+
+  return data;
 }
 
 // Kept so any old code that uploads a single file still works.

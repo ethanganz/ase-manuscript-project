@@ -76,6 +76,7 @@ function App() {
   const [collectionDescription, setCollectionDescription] = useState("");
   const [collectionIsPublic, setCollectionIsPublic] = useState(true);
   const [selectedCollectionFiles, setSelectedCollectionFiles] = useState([]);
+  const [uploadLanguage, setUploadLanguage] = useState("unknown");
   const [creatingCollection, setCreatingCollection] = useState(false);
   const [collectionError, setCollectionError] = useState("");
   const [loadingCollections, setLoadingCollections] = useState(true);
@@ -232,7 +233,11 @@ function App() {
         setSelectedCollection(collectionId);
       }
 
-      const report = await uploadFiles(collectionId, selectedCollectionFiles);
+      const report = await uploadFiles(
+        collectionId,
+        selectedCollectionFiles,
+        uploadLanguage,
+      );
 
       const updatedCollections = await getCollections();
       setRemoteCollections(updatedCollections);
@@ -365,6 +370,8 @@ function App() {
         isPublic={collectionIsPublic}
         onIsPublicChange={setCollectionIsPublic}
         selectedFiles={selectedCollectionFiles}
+        language={uploadLanguage}
+        onLanguageChange={setUploadLanguage}
         submitting={creatingCollection}
         error={collectionError}
         onNameChange={setCollectionName}

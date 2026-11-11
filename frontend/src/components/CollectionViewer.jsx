@@ -8,16 +8,23 @@ import {
   Expand,
   FileText,
   Flag,
+  LoaderCircle,
   MapPin,
   Maximize2,
   Minimize2,
+  ScanText,
   Shrink,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
-import { getDocuments, getPages } from "../api/documents.js";
+import {
+  getDocuments,
+  getPageTranscription,
+  getPages,
+  transcribeDocument,
+} from "../api/documents.js";
 import { pageImageUrl } from "../api/map.js";
 import {
   getMockPlaces,
@@ -38,6 +45,80 @@ const PANEL_BAR =
 const ICON_BUTTON =
   "rounded p-1.5 text-[#55615b] transition-colors hover:bg-[#edf1ed] disabled:opacity-30";
 const ZOOM_STEPS = [1, 1.5, 2, 3];
+const IN_PROGRESS = ["queued", "processing"];
+const POLL_MS = 5000;
+
+/**
+ * The recognized text of one page. While it is still being made (queued or
+ * processing), asks again every few seconds. `reload()` starts over.
+ */
+function usePageTranscription(pageId) {
+  const [result, setResult] = useState({ pageId: "", data: null, error: "" });
+  const [reloads, setReloads] = useState(0);
+
+  useEffect(() => {
+    if (!pageId) return undefined;
+    let cancelled = false;
+    let timer;
+    function load() {
+      getPageTranscription(pageId)
+        .then((data) => {
+          if (cancelled) return;
+          setResult({ pageId, data, error: "" });
+          if (IN_PROGRESS.includes(data.status)) {
+            timer = setTimeout(load, POLL_MS);
+          }
+        })
+        .catch(
+          (e) =>
+            !cancelled && setResult({ pageId, data: null, error: e.message }),
+        );
+    }
+    load();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [pageId, reloads]);
+
+  const isCurrent = result.pageId === pageId;
+  return {
+    data: isCurrent ? result.data : null,
+    error: isCurrent ? result.error : "",
+    loading: Boolean(pageId) && !isCurrent,
+    reload: () => setReloads((n) => n + 1),
+  };
+}
+
+/** Mock lines are plain strings; give them place spans like real lines have. */
+function mockLines(lines, places) {
+  return lines.map((text) => ({
+    text,
+    places: places.flatMap(({ name }) =>
+      [...text.matchAll(new RegExp(name, "g"))].map((match) => ({
+        start: match.index,
+        end: match.index + name.length,
+      })),
+    ),
+  }));
+}
+
+/** The distinct places in recognized lines, with coordinates when known. */
+function placesFromLines(lines) {
+  const byName = new Map();
+  for (const line of lines) {
+    for (const span of line.places) {
+      if (byName.has(span.text)) continue;
+      const located = span.identities?.find((i) => i.latitude != null);
+      byName.set(span.text, {
+        name: span.text,
+        lat: located?.latitude ?? null,
+        lng: located?.longitude ?? null,
+      });
+    }
+  }
+  return [...byName.values()];
+}
 
 function MockBadge() {
   return (
@@ -226,32 +307,92 @@ function PageImagePanel({
   );
 }
 
-/** Wraps every place name in a line with a highlight. */
-function highlightPlaces(line, places) {
-  if (places.length === 0) return line;
-  const pattern = new RegExp(
-    `(${places.map((place) => place.name).join("|")})`,
-    "g",
-  );
-  return line.split(pattern).map((part, index) =>
-    places.some((place) => place.name === part) ? (
-      <mark key={index} className="rounded bg-[#e3ece5] px-0.5 text-[#1e3b35]">
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
+/** Wraps every place span ({start, end} in the line text) with a highlight. */
+function highlightPlaces({ text, places }) {
+  const spans = [...places].sort((a, b) => a.start - b.start);
+  const parts = [];
+  let at = 0;
+  for (const { start, end } of spans) {
+    if (start < at) continue; // overlaps the previous one
+    parts.push(text.slice(at, start));
+    parts.push(
+      <mark key={start} className="rounded bg-[#e3ece5] px-0.5 text-[#1e3b35]">
+        {text.slice(start, end)}
+      </mark>,
+    );
+    at = end;
+  }
+  parts.push(text.slice(at));
+  return parts;
+}
+
+/** Shown instead of the lines while there is no text to show. */
+function TranscriptionNotice({ transcription, canTranscribe, onTranscribe }) {
+  const { data, error, loading } = transcription;
+  if (loading) {
+    return (
+      <div className="space-y-3 p-4">
+        {[90, 75, 85, 60].map((width) => (
+          <div
+            key={width}
+            className="h-4 animate-pulse rounded bg-[#edf1ee]"
+            style={{ width: `${width}%` }}
+          />
+        ))}
+      </div>
+    );
+  }
+  if (error) return <p className="p-4 text-sm text-[#a04a3a]">{error}</p>;
+  if (!data) return null; // no page yet (pages still loading, or the file has none)
+  if (IN_PROGRESS.includes(data.status)) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-[#6e7975]">
+        <LoaderCircle className="size-6 animate-spin text-[#6f8e7b]" />
+        <p className="font-medium text-[#1e302b]">
+          {data.status === "queued"
+            ? "Waiting for handwriting recognition…"
+            : "Recognizing handwriting…"}
+        </p>
+        <p>The text appears here when it is ready, usually in a few minutes.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-[#6e7975]">
+      <p>
+        {data.status === "failed"
+          ? `Recognition failed: ${data.error || "unknown error"}`
+          : "No lines of text were found on this page."}
+      </p>
+      {canTranscribe && (
+        <button
+          type="button"
+          onClick={onTranscribe}
+          className="flex items-center gap-2 rounded-lg border border-[#dfe5df] px-3 py-1.5 text-[#55615b] hover:bg-[#f7f9f6]"
+        >
+          <ScanText className="size-4" />
+          Try again
+        </button>
+      )}
+    </div>
   );
 }
 
-/** Right side: the transcription of the current page. */
+/**
+ * Right side: the transcription of the current page. Pages never sent for
+ * recognition show mock text, so the viewer can still be tried out.
+ */
 function TranscriptionPanel({
+  transcription,
   lines,
-  places,
+  isMock,
   pageNumber,
+  canTranscribe,
+  onTranscribe,
   isFocused,
   onToggleFocus,
 }) {
+  const showLines = isMock || lines.length > 0;
   return (
     <div className={PANEL}>
       <div className={PANEL_BAR}>
@@ -259,7 +400,29 @@ function TranscriptionPanel({
           Transcription · page {pageNumber}
         </p>
         <div className="flex shrink-0 items-center gap-2">
-          <MockBadge />
+          {isMock && canTranscribe && (
+            <button
+              type="button"
+              onClick={onTranscribe}
+              className="flex items-center gap-1.5 rounded-lg border border-[#dfe5df] px-2 py-1 text-xs text-[#55615b] hover:bg-[#f7f9f6]"
+              title="Recognize the handwriting on every page of this document"
+            >
+              <ScanText className="size-3.5" />
+              Transcribe
+            </button>
+          )}
+          {isMock ? (
+            <MockBadge />
+          ) : (
+            showLines && (
+              <span
+                className="shrink-0 rounded-full bg-[#edf1ed] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#476d5b]"
+                title="Machine-read text, not yet checked by a person"
+              >
+                Unverified
+              </span>
+            )
+          )}
           <FocusButton
             isFocused={isFocused}
             onToggle={onToggleFocus}
@@ -268,13 +431,23 @@ function TranscriptionPanel({
         </div>
       </div>
 
-      <ol className="min-h-0 flex-1 overflow-auto px-4 py-4 font-serif text-[16px] leading-8 text-[#2a3833]">
+      {!showLines && (
+        <TranscriptionNotice
+          transcription={transcription}
+          canTranscribe={canTranscribe}
+          onTranscribe={onTranscribe}
+        />
+      )}
+      <ol
+        hidden={!showLines}
+        className="min-h-0 flex-1 overflow-auto px-4 py-4 font-serif text-[16px] leading-8 text-[#2a3833]"
+      >
         {lines.map((line, index) => (
           <li key={index} className="grid grid-cols-[2rem_1fr] gap-3">
             <span className="select-none text-right font-sans text-xs leading-8 text-[#b0bab5]">
               {index + 1}
             </span>
-            <span>{line ? highlightPlaces(line, places) : " "}</span>
+            <span>{line.text ? highlightPlaces(line) : " "}</span>
           </li>
         ))}
       </ol>
@@ -283,9 +456,10 @@ function TranscriptionPanel({
 }
 
 /** Bottom bar: the places on this page. Collapsed by default; opens a small map. */
-function PlacesBar({ places, mapKey }) {
+function PlacesBar({ places, isMock, mapKey }) {
   const [isOpen, setIsOpen] = useState(false);
   const hasPlaces = places.length > 0;
+  const located = places.filter((place) => place.lat != null);
 
   return (
     <section className="shrink-0 overflow-hidden rounded-xl border border-[#e0e6e0] bg-white">
@@ -316,7 +490,7 @@ function PlacesBar({ places, mapKey }) {
             </span>
           )}
         </span>
-        <MockBadge />
+        {isMock && <MockBadge />}
         {hasPlaces && (
           <span className="flex shrink-0 items-center gap-1 text-xs text-[#6e7975]">
             <span className="hidden sm:inline">
@@ -335,33 +509,39 @@ function PlacesBar({ places, mapKey }) {
         <div className="grid border-t border-[#edf0ed] md:grid-cols-[1fr_260px]">
           {/* `isolate` keeps Leaflet's high z-indexes below the sticky header. */}
           <div className="isolate h-[200px]">
-            <MapContainer
-              key={mapKey}
-              bounds={places.map((place) => [place.lat, place.lng])}
-              boundsOptions={{ padding: [40, 40], maxZoom: 8 }}
-              scrollWheelZoom={false}
-              className="size-full"
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {places.map((place) => (
-                <CircleMarker
-                  key={place.name}
-                  center={[place.lat, place.lng]}
-                  radius={8}
-                  pathOptions={{
-                    color: "#1e3b35",
-                    fillColor: "#6f8e7b",
-                    fillOpacity: 0.85,
-                    weight: 2,
-                  }}
-                >
-                  <Tooltip>{place.name}</Tooltip>
-                </CircleMarker>
-              ))}
-            </MapContainer>
+            {located.length === 0 ? (
+              <p className="grid size-full place-items-center bg-[#f2f4f1] px-4 text-center text-xs text-[#8a9790]">
+                None of these places could be located on the map yet.
+              </p>
+            ) : (
+              <MapContainer
+                key={mapKey}
+                bounds={located.map((place) => [place.lat, place.lng])}
+                boundsOptions={{ padding: [40, 40], maxZoom: 8 }}
+                scrollWheelZoom={false}
+                className="size-full"
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {located.map((place) => (
+                  <CircleMarker
+                    key={place.name}
+                    center={[place.lat, place.lng]}
+                    radius={8}
+                    pathOptions={{
+                      color: "#1e3b35",
+                      fillColor: "#6f8e7b",
+                      fillOpacity: 0.85,
+                      weight: 2,
+                    }}
+                  >
+                    <Tooltip>{place.name}</Tooltip>
+                  </CircleMarker>
+                ))}
+              </MapContainer>
+            )}
           </div>
 
           <ul className="max-h-[200px] divide-y divide-[#edf0ed] overflow-auto border-t border-[#edf0ed] md:border-l md:border-t-0">
@@ -371,8 +551,12 @@ function PlacesBar({ places, mapKey }) {
                   {place.name}
                 </p>
                 <p className="text-xs text-[#8a9790]">
-                  {countryDisplayName(place.country_code)} ·{" "}
-                  {place.lat.toFixed(2)}, {place.lng.toFixed(2)}
+                  {place.country_code &&
+                    `${countryDisplayName(place.country_code)} · `}
+                  {place.lat == null
+                    ? "Not located"
+                    : `${place.lat.toFixed(2)}, ${place.lng.toFixed(2)}`}
+                  {!isMock && " · unverified"}
                 </p>
               </li>
             ))}
@@ -434,11 +618,29 @@ export function CollectionViewer({
     Math.max(0, pages.length - 1),
   );
   const pageNumber = pages[pageIndex]?.page_number ?? 1;
+  const isOwner = Boolean(user) && collection?.owner_id === user.id;
 
-  const transcription = documentId
-    ? getMockTranscription(documentId, pageNumber)
-    : [];
-  const places = documentId ? getMockPlaces(documentId, pageNumber) : [];
+  const transcription = usePageTranscription(pages[pageIndex]?.id ?? "");
+  // Never sent for recognition (or no HTR service set up): show mock text.
+  const isMock = transcription.data?.status === "pending";
+  let lines = [];
+  let places = [];
+  if (isMock) {
+    places = getMockPlaces(documentId, pageNumber);
+    lines = mockLines(getMockTranscription(documentId, pageNumber), places);
+  } else if (transcription.data?.status === "done") {
+    lines = transcription.data.lines;
+    places = placesFromLines(lines);
+  }
+
+  async function startTranscription() {
+    try {
+      await transcribeDocument(documentId);
+    } catch (error) {
+      window.alert(error.message);
+    }
+    transcription.reload();
+  }
 
   function changePage(index) {
     setPageIndexByDocument((previous) => ({
@@ -560,16 +762,23 @@ export function CollectionViewer({
             )}
             {focus !== "page" && (
               <TranscriptionPanel
-                lines={transcription}
-                places={places}
+                transcription={transcription}
+                lines={lines}
+                isMock={isMock}
                 pageNumber={pageNumber}
+                canTranscribe={isOwner}
+                onTranscribe={startTranscription}
                 isFocused={focus === "text"}
                 onToggleFocus={() => toggleFocus("text")}
               />
             )}
           </div>
 
-          <PlacesBar places={places} mapKey={`${documentId}/${pageNumber}`} />
+          <PlacesBar
+            places={places}
+            isMock={isMock}
+            mapKey={`${documentId}/${pageNumber}`}
+          />
         </>
       )}
 
