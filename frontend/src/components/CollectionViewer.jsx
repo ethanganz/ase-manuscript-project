@@ -23,8 +23,8 @@ import {
   getMockPlaces,
   getMockTranscription,
 } from "../data/mockTranscriptions.js";
-import { countryDisplayName } from "../libraray/countries.js";
-import { useFetch } from "../libraray/useFetch.js";
+import { countryDisplayName } from "../library/countries.js";
+import { useFetch } from "../library/useFetch.js";
 import { ReportCollectionModal } from "./ReportCollectionModal.jsx";
 
 // On large screens the viewer fills the window below the 76px header (minus

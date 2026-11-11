@@ -6,7 +6,7 @@ import {
   countryStyle,
   getCountryCode,
   indexByCode,
-} from "../libraray/countries.js";
+} from "../library/countries.js";
 // The map itself
 // import.meta.env.BASE_URL keeps this working when the app is served under a
 // sub-path (VITE_BASE_PATH, e.g. /apps/staging/).

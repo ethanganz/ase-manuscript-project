@@ -7,6 +7,7 @@ tests use ``InMemoryRepository`` .
 The repository is the only place that touches the database.
 """
 
+import unicodedata
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -38,6 +39,8 @@ class Repository:
     def create_pages(self, pages: list[dict]) -> None: ...
     def get_page(self, page_id: str) -> dict | None: ...
     def list_pages(self, document_id: str) -> list[dict]: ...
+    def upsert_text_lines(self, rows: list[dict]) -> None: ...
+    def search_text_lines(self, words: list[str], collection_id: str, limit: int) -> list[dict]: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
     def create_report(
@@ -58,6 +61,7 @@ class InMemoryRepository(Repository):
         self.pages: dict[str, dict] = {}
         self.mention_details: list[dict] = []  # tests put rows here
         self.reports: dict[str, dict] = {}
+        self.text_lines: dict[str, dict] = {}  # keyed by source_line_id
 
     @staticmethod
     def _now() -> str:
@@ -203,6 +207,44 @@ class InMemoryRepository(Repository):
         for r in self.reports.values():
             if r["collection_id"] in collection_ids and r["read_at"] is None:
                 r["read_at"] = self._now()
+
+    def upsert_text_lines(self, rows):
+        for row in rows:
+            existing = self.text_lines.get(row["source_line_id"])
+            if existing:
+                existing.update(row)  # columns not in ``row`` (such as page_id) stay as they are
+            else:
+                self.text_lines[row["source_line_id"]] = {
+                    "id": str(uuid4()),
+                    "page_id": None,
+                    "created_at": self._now(),
+                    **row,
+                }
+
+    def search_text_lines(self, words, collection_id, limit):
+        # Simplified stand-in for the SQL function: a word matches when it appears in the
+        # line, ignoring case and accents. It does not tolerate misspellings.
+        document_ids = {
+            d["id"] for d in self.documents.values() if d["collection_id"] == collection_id
+        }
+        page_ids = {p["id"] for p in self.pages.values() if p["document_id"] in document_ids}
+        folded_words = {_fold(w) for w in words if w.strip()}
+        hits = []
+        for line in self.text_lines.values():
+            if line.get("page_id") not in page_ids:
+                continue
+            folded = _fold(line["text"])
+            score = float(sum(1 for w in folded_words if w in folded))
+            if score:
+                hits.append({**line, "score": score})
+        hits.sort(key=lambda h: (-h["score"], h["source_line_id"]))
+        return hits[: max(1, min(limit, 100))]
+
+
+def _fold(text: str) -> str:
+    """Lower case without accents: "Zürich" becomes "zurich"."""
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
 class SupabaseRepository(Repository):
@@ -398,3 +440,27 @@ class SupabaseRepository(Repository):
                 .is_("read_at", "null")
                 .execute()
             )
+
+    def upsert_text_lines(self, rows):
+        # In chunks of 500, so one request never gets too large. Columns missing
+        # from a row are left unchanged when the line already exists.
+        for start in range(0, len(rows), 500):
+            self._t("text_lines").upsert(
+                rows[start : start + 500], on_conflict="source_line_id"
+            ).execute()
+
+    def search_text_lines(self, words, collection_id, limit):
+        # Calls the SQL function search_text_lines (see the migration file).
+        res = (
+            self._sb()
+            .rpc(
+                "search_text_lines",
+                {
+                    "query_words": words,
+                    "collection": collection_id,
+                    "max_results": limit,
+                },
+            )
+            .execute()
+        )
+        return res.data or []
