@@ -6,6 +6,10 @@ from database.repository import Repository, SupabaseRepository
 from services.auth import decode_token
 from services.email import EmailSender, ResendEmailSender
 from services.storage import ObjectStorage, SupabaseStorage
+from fastapi import HTTPException
+
+from services.llm import LLM, LLMUnavailable, default_llm
+
 
 # Reads the login cookie. Also shows the lock icon in the API docs.
 auth_cookie = APIKeyCookie(name=config.AUTH_COOKIE_NAME, auto_error=False)
@@ -58,3 +62,13 @@ def require_visible_collection(repo: Repository, collection_id: str, user: dict 
     if collection is None or not can_view(collection, user):
         raise HTTPException(status_code=404, detail="Collection not found")
     return collection
+
+
+
+def get_llm() -> LLM:
+    """FastAPI dependency. Tests override this with a fake model."""
+    try:
+        return default_llm()
+    except LLMUnavailable as error:  # not configured
+        raise HTTPException(
+            status_code=503, detail={"code": "llm_unavailable", "message": str(error)})
