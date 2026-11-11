@@ -1,4 +1,5 @@
 """Tests for the ask endpoint. A fake model replaces Gemini: no network, no key, no cost."""
+
 from uuid import uuid4
 
 import pytest
@@ -6,8 +7,14 @@ import pytest
 import config
 from deps import get_llm
 from main import app
-from services.ask import (NO_MATCH, NOT_FOUND, SYSTEM_INSTRUCTION, UNSOURCED, build_prompt,
-                          cited_numbers)
+from services.ask import (
+    NO_MATCH,
+    NOT_FOUND,
+    SYSTEM_INSTRUCTION,
+    UNSOURCED,
+    build_prompt,
+    cited_numbers,
+)
 from services.llm import FakeLLM, LLMRateLimited, LLMUnavailable, default_llm
 
 
@@ -21,8 +28,12 @@ def add_lines(repo, collection_id, texts):
     document_id, page_id = str(uuid4()), str(uuid4())
     repo.create_document({"id": document_id, "collection_id": collection_id})
     repo.create_pages([{"id": page_id, "document_id": document_id, "page_number": 3}])
-    repo.upsert_text_lines([{"source_line_id": f"{page_id}-{i}", "text": text, "language": "la"}
-                            for i, text in enumerate(texts)])
+    repo.upsert_text_lines(
+        [
+            {"source_line_id": f"{page_id}-{i}", "text": text, "language": "la"}
+            for i, text in enumerate(texts)
+        ]
+    )
     for line in repo.text_lines.values():
         if line["source_line_id"].startswith(page_id):
             line["page_id"] = page_id
@@ -82,8 +93,11 @@ def test_an_answer_without_a_valid_citation_is_withheld(client, repo, collection
     add_lines(repo, collection["id"], ["ad Zürich missi"])
     use_llm(FakeLLM(reply="Zürich is in Switzerland."))
     assert ask(client, collection["id"]).json() == {
-        "answer": UNSOURCED, "sources": [], "grounded": False}
-    use_llm(FakeLLM(reply="Zürich is mentioned [7]."))      # line 7 does not exist
+        "answer": UNSOURCED,
+        "sources": [],
+        "grounded": False,
+    }
+    use_llm(FakeLLM(reply="Zürich is mentioned [7]."))  # line 7 does not exist
     assert ask(client, collection["id"]).json()["answer"] == UNSOURCED
 
 
@@ -142,11 +156,14 @@ def test_prompt_has_one_numbered_line_each_and_no_line_breaks_inside_lines():
     assert prompt.splitlines()[1:3] == ["[1] first line two", "[2] second"]
 
 
-@pytest.mark.parametrize("answer, expected", [
-    ("A [1] and B [2][3].", [1, 2, 3]),
-    ("A [1, 3] and again [1].", [1, 3]),
-    ("Unknown [0] [9] and (1).", []),
-    ("No citation at all.", []),
-])
+@pytest.mark.parametrize(
+    "answer, expected",
+    [
+        ("A [1] and B [2][3].", [1, 2, 3]),
+        ("A [1, 3] and again [1].", [1, 3]),
+        ("Unknown [0] [9] and (1).", []),
+        ("No citation at all.", []),
+    ],
+)
 def test_cited_numbers(answer, expected):
     assert cited_numbers(answer, 3) == expected

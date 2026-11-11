@@ -1,4 +1,5 @@
 """Tests for the Gemini wrapper. A stub replaces the real Gemini client: no network, no key."""
+
 from types import SimpleNamespace
 
 import pytest
@@ -6,8 +7,15 @@ from google.genai import errors
 
 import config
 from services import llm as llm_module
-from services.llm import (FakeLLM, GeminiLLM, LLMRateLimited, LLMUnavailable, default_llm,
-                          is_daily_limit, parse_retry_after)
+from services.llm import (
+    FakeLLM,
+    GeminiLLM,
+    LLMRateLimited,
+    LLMUnavailable,
+    default_llm,
+    is_daily_limit,
+    parse_retry_after,
+)
 
 
 class StubClient:
@@ -37,17 +45,37 @@ class Clock:
 def quota_error(retry_delay=None, message="You exceeded your current quota.", quota_id=None):
     details = []
     if retry_delay:
-        details.append({"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": retry_delay})
+        details.append(
+            {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": retry_delay}
+        )
     if quota_id:
-        details.append({"@type": "type.googleapis.com/google.rpc.QuotaFailure",
-                        "violations": [{"quotaId": quota_id}]})
-    return errors.ClientError(429, {"error": {
-        "code": 429, "message": message, "status": "RESOURCE_EXHAUSTED", "details": details}})
+        details.append(
+            {
+                "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                "violations": [{"quotaId": quota_id}],
+            }
+        )
+    return errors.ClientError(
+        429,
+        {
+            "error": {
+                "code": 429,
+                "message": message,
+                "status": "RESOURCE_EXHAUSTED",
+                "details": details,
+            }
+        },
+    )
 
 
 def make(client, clock=None, default_retry=60):
-    return GeminiLLM("key", "some-model", default_retry_seconds=default_retry,
-                     client=client, clock=clock or Clock())
+    return GeminiLLM(
+        "key",
+        "some-model",
+        default_retry_seconds=default_retry,
+        client=client,
+        clock=clock or Clock(),
+    )
 
 
 def test_answer_is_returned_and_sent_with_model_system_text_and_prompt():
@@ -94,7 +122,7 @@ def test_after_a_limit_gemini_is_not_called_again_until_the_wait_is_over():
     with pytest.raises(LLMRateLimited) as info:
         llm.generate("s", "p")
     assert info.value.retry_after_seconds == 20
-    assert len(client.calls) == 1            # the second request never reached Gemini
+    assert len(client.calls) == 1  # the second request never reached Gemini
 
     clock.now += 21
     assert llm.generate("s", "p") == "back again"
@@ -111,12 +139,17 @@ def test_the_daily_flag_is_kept_while_waiting():
     assert info.value.daily is True
 
 
-@pytest.mark.parametrize("failure", [
-    errors.ServerError(500, {"error": {"message": "boom", "status": "INTERNAL"}}),
-    errors.ClientError(403, {"error": {"message": "key SECRET-KEY refused", "status": "PERMISSION_DENIED"}}),
-    errors.ClientError(404, {"error": {"message": "model not found", "status": "NOT_FOUND"}}),
-    TimeoutError("timed out"),
-])
+@pytest.mark.parametrize(
+    "failure",
+    [
+        errors.ServerError(500, {"error": {"message": "boom", "status": "INTERNAL"}}),
+        errors.ClientError(
+            403, {"error": {"message": "key SECRET-KEY refused", "status": "PERMISSION_DENIED"}}
+        ),
+        errors.ClientError(404, {"error": {"message": "model not found", "status": "NOT_FOUND"}}),
+        TimeoutError("timed out"),
+    ],
+)
 def test_other_failures_become_a_safe_unavailable_error(failure):
     with pytest.raises(LLMUnavailable) as info:
         make(StubClient(failure)).generate("s", "p")
@@ -164,10 +197,11 @@ def test_fake_llm_records_calls_and_can_fail():
 
 
 def test_manual_check_reports_the_wait_time(monkeypatch, capsys):
-    monkeypatch.setattr(llm_module, "default_llm",
-                        lambda: FakeLLM(error=LLMRateLimited(32, daily=True)))
+    monkeypatch.setattr(
+        llm_module, "default_llm", lambda: FakeLLM(error=LLMRateLimited(32, daily=True))
+    )
     assert llm_module.main(["hi"]) == 3
     assert "Wait 32 seconds" in capsys.readouterr().out
 
 
-# pytest tests/test_llm.py -v  
+# pytest tests/test_llm.py -v

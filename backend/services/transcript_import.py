@@ -14,6 +14,7 @@ Command line (run from the ``backend`` folder)::
     python -m services.transcript_import path/to/file.jsonl --dry-run
     python -m services.transcript_import path/to/file.jsonl
 """
+
 from __future__ import annotations
 
 import argparse
@@ -36,7 +37,7 @@ _OPTIONAL_FIELDS = {
 class ImportReport:
     """What happened during an import."""
 
-    rows: list[dict] = field(default_factory=list)       # valid, de-duplicated rows
+    rows: list[dict] = field(default_factory=list)  # valid, de-duplicated rows
     skipped: list[tuple[int, str]] = field(default_factory=list)  # (line number, reason)
 
     @property
@@ -96,8 +97,9 @@ def parse_transcript(lines: Iterable[str]) -> ImportReport:
     return report
 
 
-def import_transcript(repo: Repository | None, lines: Iterable[str],
-                      dry_run: bool = False) -> ImportReport:
+def import_transcript(
+    repo: Repository | None, lines: Iterable[str], dry_run: bool = False
+) -> ImportReport:
     """Parse ``lines`` and store the valid rows.
 
     With ``dry_run`` nothing is written and ``repo`` may be None.
@@ -113,8 +115,9 @@ def import_transcript(repo: Repository | None, lines: Iterable[str],
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Import transcript lines into text_lines.")
     parser.add_argument("path", help="JSON Lines file")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="check the file and print the result without writing")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="check the file and print the result without writing"
+    )
     args = parser.parse_args(argv)
 
     repo = None

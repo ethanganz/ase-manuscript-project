@@ -33,15 +33,22 @@ def ask(
     try:
         return answer_question(repo, llm, str(collection_id), payload.question)
     except LLMRateLimited as error:
-        message = ("The daily question limit is reached. Please try again later."
-                   if error.daily else
-                   f"The question limit is reached. Please wait {error.retry_after_seconds} seconds.")
+        message = (
+            "The daily question limit is reached. Please try again later."
+            if error.daily
+            else f"The question limit is reached. Please wait {error.retry_after_seconds} seconds."
+        )
         raise HTTPException(
             status_code=429,
-            detail={"code": "llm_rate_limited", "message": message,
-                    "retry_after_seconds": error.retry_after_seconds, "daily": error.daily},
+            detail={
+                "code": "llm_rate_limited",
+                "message": message,
+                "retry_after_seconds": error.retry_after_seconds,
+                "daily": error.daily,
+            },
             headers={"Retry-After": str(error.retry_after_seconds)},
         )
     except LLMUnavailable as error:
         raise HTTPException(
-            status_code=503, detail={"code": "llm_unavailable", "message": str(error)})
+            status_code=503, detail={"code": "llm_unavailable", "message": str(error)}
+        )

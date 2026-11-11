@@ -7,6 +7,7 @@ The instructions are written here and are never taken from the user. The user on
 supplies the question. This keeps every answer tied to lines that can be traced
 back to a page image.
 """
+
 from __future__ import annotations
 
 import logging
@@ -19,13 +20,15 @@ from services.text_search import search_lines
 
 logger = logging.getLogger(__name__)
 
-MAX_LINES = 12          # lines given to the model
-MAX_LINE_CHARS = 500    # longer lines are cut
+MAX_LINES = 12  # lines given to the model
+MAX_LINE_CHARS = 500  # longer lines are cut
 
 NOT_FOUND = "The documents do not contain an answer to this question."
 NO_MATCH = "No line in this collection matches the words of your question."
-UNSOURCED = ("The AI did not cite any line, so its answer cannot be checked and is not "
-             "shown. Try rephrasing the question.")
+UNSOURCED = (
+    "The AI did not cite any line, so its answer cannot be checked and is not "
+    "shown. Try rephrasing the question."
+)
 
 SYSTEM_INSTRUCTION = f"""You answer questions about historical manuscripts. The user message contains \
 numbered transcript lines and a question.
@@ -52,9 +55,12 @@ def build_prompt(question: str, lines: list[dict]) -> str:
     """The user message: numbered lines first, the question last."""
     numbered = "\n".join(
         f"[{number}] {' '.join(line['text'].split())[:MAX_LINE_CHARS]}"
-        for number, line in enumerate(lines, start=1))
-    return ("Transcript lines (software-read handwriting, may contain errors):\n"
-            f"{numbered}\n\nQuestion: {question}")
+        for number, line in enumerate(lines, start=1)
+    )
+    return (
+        "Transcript lines (software-read handwriting, may contain errors):\n"
+        f"{numbered}\n\nQuestion: {question}"
+    )
 
 
 def cited_numbers(answer: str, line_count: int) -> list[int]:
@@ -87,9 +93,15 @@ def answer_question(repo: Repository, llm: LLM, collection_id: str, question: st
     for number in numbers:
         line = lines[number - 1]
         page = repo.get_page(line["page_id"]) or {}
-        sources.append({
-            "label": number, "id": line["id"], "page_id": line["page_id"],
-            "document_id": page.get("document_id"), "page_number": page.get("page_number"),
-            "language": line.get("language"), "text": line["text"],
-        })
+        sources.append(
+            {
+                "label": number,
+                "id": line["id"],
+                "page_id": line["page_id"],
+                "document_id": page.get("document_id"),
+                "page_number": page.get("page_number"),
+                "language": line.get("language"),
+                "text": line["text"],
+            }
+        )
     return AskResult(answer=answer, sources=sources, grounded=True)

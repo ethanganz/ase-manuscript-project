@@ -1,4 +1,5 @@
 """Tests for importing transcript lines. No database or network is used."""
+
 import json
 import unicodedata
 
@@ -12,16 +13,28 @@ def _line(**fields) -> str:
     return json.dumps(fields, ensure_ascii=False)
 
 
-GOOD = _line(document_id="485", page_id="485_01", line_id="485_01_r1l5",
-             language="de", text="geben uff den sommet.", image_path="/some/local/path.png")
+GOOD = _line(
+    document_id="485",
+    page_id="485_01",
+    line_id="485_01_r1l5",
+    language="de",
+    text="geben uff den sommet.",
+    image_path="/some/local/path.png",
+)
 
 
 def test_valid_line_becomes_a_row_without_the_local_image_path():
     report = parse_transcript([GOOD])
     assert report.skipped == []
-    assert report.rows == [{
-        "source_line_id": "485_01_r1l5", "text": "geben uff den sommet.",
-        "source_document_id": "485", "source_page_id": "485_01", "language": "de"}]
+    assert report.rows == [
+        {
+            "source_line_id": "485_01_r1l5",
+            "text": "geben uff den sommet.",
+            "source_document_id": "485",
+            "source_page_id": "485_01",
+            "language": "de",
+        }
+    ]
 
 
 def test_only_line_id_and_text_are_required():
@@ -30,12 +43,23 @@ def test_only_line_id_and_text_are_required():
 
 
 def test_bad_lines_are_skipped_with_a_reason_and_do_not_stop_the_import():
-    report = parse_transcript([
-        "{not json", "[1, 2]", _line(text="no id"), _line(line_id="x", text="   "), "",
-        _line(line_id="ok", text="fine")])
+    report = parse_transcript(
+        [
+            "{not json",
+            "[1, 2]",
+            _line(text="no id"),
+            _line(line_id="x", text="   "),
+            "",
+            _line(line_id="ok", text="fine"),
+        ]
+    )
     assert [r["source_line_id"] for r in report.rows] == ["ok"]
     assert report.skipped == [
-        (1, "not valid JSON"), (2, "not a JSON object"), (3, "missing line_id"), (4, "empty text")]
+        (1, "not valid JSON"),
+        (2, "not a JSON object"),
+        (3, "missing line_id"),
+        (4, "empty text"),
+    ]
 
 
 def test_duplicate_line_id_in_one_file_keeps_the_later_line():
@@ -60,7 +84,7 @@ def test_numeric_ids_are_stored_as_text():
 def test_import_twice_does_not_duplicate_and_keeps_a_page_link():
     repo = InMemoryRepository()
     import_transcript(repo, [GOOD])
-    repo.text_lines["485_01_r1l5"]["page_id"] = "page-uuid"      # linked to a page later
+    repo.text_lines["485_01_r1l5"]["page_id"] = "page-uuid"  # linked to a page later
     import_transcript(repo, [_line(line_id="485_01_r1l5", text="geben uff den sommer.")])
     assert len(repo.text_lines) == 1
     row = repo.text_lines["485_01_r1l5"]
@@ -91,5 +115,5 @@ def test_cli_returns_error_code_when_nothing_is_usable(tmp_path):
     path.write_text("{broken\n", encoding="utf-8")
     assert main([str(path), "--dry-run"]) == 1
 
-# pytest tests/test_transcript_import.py -v 
 
+# pytest tests/test_transcript_import.py -v

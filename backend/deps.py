@@ -64,11 +64,11 @@ def require_visible_collection(repo: Repository, collection_id: str, user: dict 
     return collection
 
 
-
 def get_llm() -> LLM:
     """FastAPI dependency. Tests override this with a fake model."""
     try:
         return default_llm()
     except LLMUnavailable as error:  # not configured
         raise HTTPException(
-            status_code=503, detail={"code": "llm_unavailable", "message": str(error)})
+            status_code=503, detail={"code": "llm_unavailable", "message": str(error)}
+        )

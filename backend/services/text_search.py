@@ -9,6 +9,7 @@ Limits, on purpose:
   find a Latin line that only says "Tigurum".
 * Only the first ``MAX_WORDS`` meaningful words of a question are used.
 """
+
 from __future__ import annotations
 
 import re
@@ -21,13 +22,15 @@ DEFAULT_LIMIT = 20
 
 # Question words that say nothing about the content. Short words (under three
 # letters) are dropped by the length rule and are not listed.
-STOPWORDS = frozenset("""
+STOPWORDS = frozenset(
+    """
     the and for with from that this these those who whom whose what which when where why how
     did does was were are been being has have had will would can could should about into onto
     over under than then there their they them you your our his her its not any all some
     tell show find list give mention mentions mentioned say says said write writes wrote written
     der die das und ist wer was wo wie wann warum über von mit für nicht eine einen einem
-    """.split())
+    """.split()
+)
 
 _WORD = re.compile(r"[^\W\d_]+", re.UNICODE)  # runs of letters, in any language
 
@@ -45,8 +48,9 @@ def extract_query_words(question: str, max_words: int = MAX_WORDS) -> list[str]:
     return words
 
 
-def search_lines(repo: Repository, question: str, collection_id: str,
-                 limit: int = DEFAULT_LIMIT) -> list[dict]:
+def search_lines(
+    repo: Repository, question: str, collection_id: str, limit: int = DEFAULT_LIMIT
+) -> list[dict]:
     """Best matching lines of one collection, best first. Empty if nothing matches."""
     words = extract_query_words(question)
     if not words:

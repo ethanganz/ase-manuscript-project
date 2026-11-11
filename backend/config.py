@@ -58,7 +58,6 @@ MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", "500"))
 PDF_RENDER_DPI = int(os.getenv("PDF_RENDER_DPI", "200"))
 
 
-
 # --- LLM (Gemini) ----------------------------------------------------------
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

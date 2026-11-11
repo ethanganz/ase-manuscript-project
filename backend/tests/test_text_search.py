@@ -1,11 +1,14 @@
 """Tests for turning a question into search words and finding lines. No database is used."""
+
 from database.repository import InMemoryRepository
 from services.text_search import extract_query_words, search_lines
 
 
 def test_question_words_lose_filler_words_and_duplicates():
     assert extract_query_words("Who writes about Zürich? Tell me about Zürich and Basel!") == [
-        "zürich", "basel"]
+        "zürich",
+        "basel",
+    ]
 
 
 def test_short_words_numbers_and_punctuation_are_ignored():
@@ -33,12 +36,14 @@ def _repo_with_lines():
     repo.documents["d2"] = {"id": "d2", "collection_id": "c2"}
     repo.pages["p1"] = {"id": "p1", "document_id": "d1", "page_number": 1}
     repo.pages["p2"] = {"id": "p2", "document_id": "d2", "page_number": 1}
-    repo.upsert_text_lines([
-        {"source_line_id": "a", "text": "ad Zürich missi"},
-        {"source_line_id": "b", "text": "Rex quidam Zürich et Basileę"},
-        {"source_line_id": "c", "text": "Zürich in the other collection"},
-        {"source_line_id": "d", "text": "no place here"},
-    ])
+    repo.upsert_text_lines(
+        [
+            {"source_line_id": "a", "text": "ad Zürich missi"},
+            {"source_line_id": "b", "text": "Rex quidam Zürich et Basileę"},
+            {"source_line_id": "c", "text": "Zürich in the other collection"},
+            {"source_line_id": "d", "text": "no place here"},
+        ]
+    )
     repo.text_lines["a"]["page_id"] = "p1"
     repo.text_lines["b"]["page_id"] = "p1"
     repo.text_lines["c"]["page_id"] = "p2"
@@ -61,6 +66,7 @@ def test_search_with_no_usable_words_does_not_touch_the_database():
     class Boom(InMemoryRepository):
         def search_text_lines(self, *a, **k):
             raise AssertionError("should not be called")
+
     assert search_lines(Boom(), "what is this?", "c1") == []
 
 
@@ -75,7 +81,7 @@ def test_limit_is_applied():
 
 
 # cd backend
-# pytest tests/test_text_search.py tests/test_transcript_import.py -v 
+# pytest tests/test_text_search.py tests/test_transcript_import.py -v
 
 
 # select score, source_line_id, text from search_text_lines(array['exull']);       -- 878_01_r2l14, about 0.67

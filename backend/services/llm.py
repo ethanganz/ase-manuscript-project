@@ -15,6 +15,7 @@ Manual check with a real key (run from the ``backend`` folder)::
 
     python -m services.llm "Say hello in Latin"
 """
+
 from __future__ import annotations
 
 import logging
@@ -89,7 +90,10 @@ def is_daily_limit(error: errors.APIError) -> bool:
     """
     for item in _error_items(error.details):
         for violation in item.get("violations", []) or []:
-            if isinstance(violation, dict) and "perday" in str(violation.get("quotaId", "")).lower():
+            if (
+                isinstance(violation, dict)
+                and "perday" in str(violation.get("quotaId", "")).lower()
+            ):
                 return True
     return False
 
@@ -97,9 +101,15 @@ def is_daily_limit(error: errors.APIError) -> bool:
 class GeminiLLM:
     """``LLM`` backed by the Gemini API."""
 
-    def __init__(self, api_key: str, model: str, timeout_seconds: int = 30,
-                 default_retry_seconds: int = 60, client: Any = None,
-                 clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        timeout_seconds: int = 30,
+        default_retry_seconds: int = 60,
+        client: Any = None,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
         self._model = model
         self._default_retry = default_retry_seconds
         self._clock = clock
@@ -195,8 +205,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         print(default_llm().generate("Answer briefly.", " ".join(args)))
     except LLMRateLimited as error:
-        print(f"Limit reached. Wait {error.retry_after_seconds} seconds."
-              + (" (daily limit)" if error.daily else ""))
+        print(
+            f"Limit reached. Wait {error.retry_after_seconds} seconds."
+            + (" (daily limit)" if error.daily else "")
+        )
         return 3
     except LLMUnavailable as error:
         print(error)

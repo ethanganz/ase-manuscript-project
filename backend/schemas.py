@@ -188,7 +188,7 @@ class AskRequest(BaseModel):
 class AskSource(BaseModel):
     """One transcript line the answer is based on, with where to find the page."""
 
-    label: int                      # the number used in the answer, e.g. [1]
+    label: int  # the number used in the answer, e.g. [1]
     id: UUID
     page_id: UUID
     document_id: Optional[UUID] = None
