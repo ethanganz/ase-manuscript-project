@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
+from typing import Optional
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
