@@ -65,6 +65,6 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "")
 
 # How long one request to Gemini may take before it is given up.
-LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
 # Wait time shown to the user when Gemini says "limit reached" without saying for how long.
 LLM_DEFAULT_RETRY_SECONDS = int(os.getenv("LLM_DEFAULT_RETRY_SECONDS", "60"))

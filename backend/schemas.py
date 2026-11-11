@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 from services.auth import MAX_PASSWORD_BYTES
+from pydantic import BaseModel, Field, field_validator
 
 """
     This defines the shape of the data the API sends back, such as what a collection or a page looks like.
@@ -169,3 +170,34 @@ class MentionOut(BaseModel):
     page_number: int
     document_id: UUID
     document_name: str
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+
+    @field_validator("question")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Question cannot be empty")
+        return value
+
+
+class AskSource(BaseModel):
+    """One transcript line the answer is based on, with where to find the page."""
+
+    label: int                      # the number used in the answer, e.g. [1]
+    id: UUID
+    page_id: UUID
+    document_id: Optional[UUID] = None
+    page_number: Optional[int] = None
+    language: Optional[str] = None
+    text: str
+
+
+class AskResponse(BaseModel):
+    answer: str
+    sources: list[AskSource]
+    # True only when the answer cites at least one real line.
+    grounded: bool
