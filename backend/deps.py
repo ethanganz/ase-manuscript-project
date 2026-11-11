@@ -5,11 +5,8 @@ import config
 from database.repository import Repository, SupabaseRepository
 from services.auth import decode_token
 from services.email import EmailSender, ResendEmailSender
-from services.storage import ObjectStorage, SupabaseStorage
-from fastapi import HTTPException
-
 from services.llm import LLM, LLMUnavailable, default_llm
-
+from services.storage import ObjectStorage, SupabaseStorage
 
 # Reads the login cookie. Also shows the lock icon in the API docs.
 auth_cookie = APIKeyCookie(name=config.AUTH_COOKIE_NAME, auto_error=False)

@@ -23,13 +23,7 @@ DEFAULT_LIMIT = 20
 # Question words that say nothing about the content. Short words (under three
 # letters) are dropped by the length rule and are not listed.
 STOPWORDS = frozenset(
-    """
-    the and for with from that this these those who whom whose what which when where why how
-    did does was were are been being has have had will would can could should about into onto
-    over under than then there their they them you your our his her its not any all some
-    tell show find list give mention mentions mentioned say says said write writes wrote written
-    der die das und ist wer was wo wie wann warum über von mit für nicht eine einen einem
-    """.split()
+    ["the", "and", "for", "with", "from", "that", "this", "these", "those", "who", "whom", "whose", "what", "which", "when", "where", "why", "how", "did", "does", "was", "were", "are", "been", "being", "has", "have", "had", "will", "would", "can", "could", "should", "about", "into", "onto", "over", "under", "than", "then", "there", "their", "they", "them", "you", "your", "our", "his", "her", "its", "not", "any", "all", "some", "tell", "show", "find", "list", "give", "mention", "mentions", "mentioned", "say", "says", "said", "write", "writes", "wrote", "written", "der", "die", "das", "und", "ist", "wer", "was", "wo", "wie", "wann", "warum", "über", "von", "mit", "für", "nicht", "eine", "einen", "einem"]
 )
 
 _WORD = re.compile(r"[^\W\d_]+", re.UNICODE)  # runs of letters, in any language

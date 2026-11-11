@@ -7,9 +7,10 @@ tests use ``InMemoryRepository`` .
 The repository is the only place that touches the database.
 """
 
+import unicodedata
 from datetime import datetime, timezone
 from uuid import uuid4
-import unicodedata
+
 from database.paging import fetch_all
 
 

@@ -24,8 +24,9 @@ import re
 import sys
 import threading
 import time
+from collections.abc import Callable
 from functools import lru_cache
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from google import genai
 from google.genai import errors, types

@@ -21,8 +21,8 @@ import argparse
 import json
 import sys
 import unicodedata
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from database.repository import Repository
 

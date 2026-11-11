@@ -2,12 +2,10 @@ import re
 from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
-from typing import Optional
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 from services.auth import MAX_PASSWORD_BYTES
-from pydantic import BaseModel, Field, field_validator
 
 """
     This defines the shape of the data the API sends back, such as what a collection or a page looks like.
@@ -191,9 +189,9 @@ class AskSource(BaseModel):
     label: int  # the number used in the answer, e.g. [1]
     id: UUID
     page_id: UUID
-    document_id: Optional[UUID] = None
-    page_number: Optional[int] = None
-    language: Optional[str] = None
+    document_id: UUID | None = None
+    page_number: int | None = None
+    language: str | None = None
     text: str
 
 
