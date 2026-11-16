@@ -20,6 +20,7 @@ from schemas import (
     FileResult,
     UploadReport,
 )
+from services import htr_worker
 from services.ingest import ingest_upload
 from services.storage import ObjectStorage
 
@@ -118,6 +119,9 @@ def upload_files(
         )
 
         for o in outcomes:
+            if o.accepted and o.document_id:
+                # Starts reading the pages in the background (does nothing when HTR is off).
+                htr_worker.enqueue_document(repo, storage, o.document_id)
             results.append(
                 FileResult(
                     filename=o.filename,
