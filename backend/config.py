@@ -56,3 +56,23 @@ MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", "500"))
 
 # PDF pages are rendered at 200 DPI
 PDF_RENDER_DPI = int(os.getenv("PDF_RENDER_DPI", "200"))
+
+# --- Handwriting recognition (HTR-NLP pipeline) ------------------------------
+# The pipeline needs PyTorch and about 3 GB of model files, so it is NOT part of
+# this backend's own dependencies. It runs as a separate Python program
+# (HTR-NLP/scripts/run_page_pipeline.py) that this backend starts for each page.
+# Off by default: uploads then just wait with status "pending".
+HTR_ENABLED = os.getenv("HTR_ENABLED", "false").lower() == "true"
+
+# Folder that holds scripts/run_page_pipeline.py and models/.
+HTR_PIPELINE_DIR = Path(os.getenv("HTR_PIPELINE_DIR") or BASE_DIR.parent / "HTR-NLP")
+
+# Python that has the HTR-NLP requirements installed (see HTR-NLP/README.md).
+# Empty = use .venv-nlp inside HTR_PIPELINE_DIR if it exists, else this Python.
+HTR_PYTHON = os.getenv("HTR_PYTHON", "")
+
+# "auto" picks CUDA when there is a GPU, otherwise CPU. Or: cpu, cuda, mps.
+HTR_DEVICE = os.getenv("HTR_DEVICE", "auto")
+
+# One page may take several minutes on a CPU. After this it is marked failed.
+HTR_TIMEOUT_SECONDS = int(os.getenv("HTR_TIMEOUT_SECONDS", "1800"))
