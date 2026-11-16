@@ -256,61 +256,61 @@ function PageImagePanel({
           <div className="mx-auto h-full w-2/3 animate-pulse rounded bg-[#e4ece5]" />
         ) : page ? (
           <>
-          <img
-            ref={imgRef}
-            key={page.id}
-            src={pageImageUrl(page.id)}
-            alt={`${document.original_filename}, page ${page.page_number}`}
-            style={
-              zoom === 1
-                ? undefined
-                : { width: `${zoom * 100}%`, maxWidth: "none" }
-            }
-            className={`mx-auto shadow-[0_4px_16px_rgba(30,42,39,0.12)] ${
-              zoom === 1 ? "max-h-full max-w-full object-contain" : "h-auto"
-            }`}
-          />
-          {box && pageWidth && pageHeight && lines.length > 0 && (
-            <svg
-              viewBox={`0 0 ${pageWidth} ${pageHeight}`}
-              preserveAspectRatio="none"
-              style={{
-                left: box.left,
-                top: box.top,
-                width: box.width,
-                height: box.height,
-              }}
-              className="pointer-events-none absolute"
-            >
-              {lines.map((line) => {
-                const points = linePoints(line);
-                if (!points) return null;
-                const isActive = activeLine?.index === line.line_index;
-                const isHover = hoverLine === line.line_index;
-                return (
-                  <polygon
-                    key={line.line_index}
-                    ref={(el) => {
-                      polygonRefs.current[line.line_index] = el;
-                    }}
-                    points={points}
-                    onClick={() => onSelectLine(line.line_index)}
-                    onMouseEnter={() => onHoverLine(line.line_index)}
-                    onMouseLeave={() => onHoverLine(null)}
-                    vectorEffect="non-scaling-stroke"
-                    strokeWidth={2}
-                    className={`pointer-events-auto cursor-pointer transition-colors ${
-                      isActive
-                        ? "fill-[#d9a520]/30 stroke-[#b8860b]"
-                        : isHover
-                          ? "fill-[#d9a520]/15 stroke-[#b8860b]/60"
-                          : "fill-transparent stroke-transparent"
-                    }`}
-                  />
-                );
-              })}
-            </svg>
-          )}
+            <img
+              ref={imgRef}
+              key={page.id}
+              src={pageImageUrl(page.id)}
+              alt={`${document.original_filename}, page ${page.page_number}`}
+              style={
+                zoom === 1
+                  ? undefined
+                  : { width: `${zoom * 100}%`, maxWidth: "none" }
+              }
+              className={`mx-auto shadow-[0_4px_16px_rgba(30,42,39,0.12)] ${
+                zoom === 1 ? "max-h-full max-w-full object-contain" : "h-auto"
+              }`}
+            />
+            {box && pageWidth && pageHeight && lines.length > 0 && (
+              <svg
+                viewBox={`0 0 ${pageWidth} ${pageHeight}`}
+                preserveAspectRatio="none"
+                style={{
+                  left: box.left,
+                  top: box.top,
+                  width: box.width,
+                  height: box.height,
+                }}
+                className="pointer-events-none absolute"
+              >
+                {lines.map((line) => {
+                  const points = linePoints(line);
+                  if (!points) return null;
+                  const isActive = activeLine?.index === line.line_index;
+                  const isHover = hoverLine === line.line_index;
+                  return (
+                    <polygon
+                      key={line.line_index}
+                      ref={(el) => {
+                        polygonRefs.current[line.line_index] = el;
+                      }}
+                      points={points}
+                      onClick={() => onSelectLine(line.line_index)}
+                      onMouseEnter={() => onHoverLine(line.line_index)}
+                      onMouseLeave={() => onHoverLine(null)}
+                      vectorEffect="non-scaling-stroke"
+                      strokeWidth={2}
+                      className={`pointer-events-auto cursor-pointer transition-colors ${
+                        isActive
+                          ? "fill-[#d9a520]/30 stroke-[#b8860b]"
+                          : isHover
+                            ? "fill-[#d9a520]/15 stroke-[#b8860b]/60"
+                            : "fill-transparent stroke-transparent"
+                      }`}
+                    />
+                  );
+                })}
+              </svg>
+            )}
           </>
         ) : (
           <p className="text-sm text-[#7e8b85]">
