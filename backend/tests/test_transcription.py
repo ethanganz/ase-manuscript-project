@@ -176,3 +176,141 @@ def test_private_collection_hides_transcription(fake_pipeline, client):
 def test_unknown_page_is_404(client):
     r = client.get("/api/pages/00000000-0000-0000-0000-000000000000/transcription")
     assert r.status_code == 404
+
+
+# ------------------------------------------------------------------ the map
+def test_transcribed_places_reach_the_country_map(fake_pipeline, client, collection, repo, storage):
+    _, page_id = _page(client, collection["id"])
+    htr_worker.process_page(repo, storage, page_id)
+
+    countries = client.get(f"/api/collections/{collection['id']}/map/countries").json()
+    assert countries == [{"country_code": "CH", "mention_count": 1, "place_count": 1}]
+
+    mentions = client.get(f"/api/collections/{collection['id']}/map/countries/CH/mentions").json()
+    assert mentions[0]["place_name"] == "Basel"
+    assert mentions[0]["page_id"] == page_id
+    assert mentions[0]["snippet"] == "Basileę ultimo iulii 1549."
+
+
+def test_transcribing_again_does_not_duplicate_map_entries(
+    fake_pipeline, client, collection, repo, storage
+):
+    _, page_id = _page(client, collection["id"])
+    htr_worker.process_page(repo, storage, page_id)
+    htr_worker.process_page(repo, storage, page_id)
+    countries = client.get(f"/api/collections/{collection['id']}/map/countries").json()
+    assert countries[0]["mention_count"] == 1
+
+
+def test_unresolved_mentions_stay_off_the_map_but_in_the_lines():
+    from services.place_linker import resolve_page
+    from services.place_lookup import PlaceLookup
+
+    lookup = PlaceLookup(variants={}, localities={})  # knows no place at all
+    lines = [
+        {
+            "text": "Ad Xyzzy",
+            "places": [{"start": 3, "end": 8, "text": "Xyzzy", "official_place_candidates": []}],
+        }
+    ]
+    assert resolve_page(lines, lookup) == []
+
+
+def test_a_broken_place_list_does_not_fail_the_page(
+    fake_pipeline, client, collection, repo, storage, monkeypatch
+):
+    def boom(_repo, _page_id, _mentions):
+        raise RuntimeError("database hiccup")
+
+    monkeypatch.setattr(repo, "replace_page_mentions", boom)
+    _, page_id = _page(client, collection["id"])
+    htr_worker.process_page(repo, storage, page_id)
+    body = client.get(f"/api/pages/{page_id}/transcription").json()
+    assert body["status"] == "complete" and len(body["lines"]) == 2
+
+
+# ---------------------------------------------------- the HTTP service (HTR-NLP/service)
+SERVICE_REPLY = {
+    "page": {"width": 800, "height": 300},
+    "lines": [
+        {
+            "line_id": "line_0001",
+            "bbox": [0, 0, 800, 100],
+            "polygon": None,
+            "text": "Ad Tigurum",
+            "places": [],
+        },
+    ],
+}
+
+
+@pytest.fixture
+def fake_service(monkeypatch):
+    """A tiny HTTP server that behaves like HTR-NLP/service."""
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    reply = {"code": 200, "body": SERVICE_REPLY}
+    seen = {"requests": 0, "had_image": False}
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            seen["requests"] += 1
+            seen["had_image"] = self.path == "/transcribe" and b'name="image"' in body
+            data = json.dumps(reply["body"]).encode()
+            self.send_response(reply["code"])
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setattr(config, "HTR_ENABLED", True)
+    monkeypatch.setattr(config, "HTR_SERVICE_URL", f"http://127.0.0.1:{server.server_port}")
+    monkeypatch.setattr(config, "HTR_TIMEOUT_SECONDS", 10)
+    yield reply, seen
+    server.shutdown()
+
+
+def test_service_mode_reads_the_page_after_upload(fake_service, client, collection):
+    _, seen = fake_service
+    _, page_id = _page(client, collection["id"])
+    body = _wait_for(client, page_id)
+    assert body["status"] == "complete"
+    assert [line["text"] for line in body["lines"]] == ["Ad Tigurum"]
+    assert (body["width"], body["height"]) == (800, 300)
+    assert seen["requests"] == 1 and seen["had_image"]
+
+
+def test_service_says_no_lines_found(fake_service, client, collection, repo, storage):
+    reply, _ = fake_service
+    reply.update(code=422, body={"detail": "No text lines found on this page"})
+    _, page_id = _page(client, collection["id"])
+    htr_worker.process_page(repo, storage, page_id)
+    body = client.get(f"/api/pages/{page_id}/transcription").json()
+    assert body["status"] == "failed" and body["error"] == "No text lines found on this page"
+
+
+def test_service_error_is_reported(fake_service, client, collection, repo, storage):
+    reply, _ = fake_service
+    reply.update(code=500, body={"detail": "boom"})
+    _, page_id = _page(client, collection["id"])
+    htr_worker.process_page(repo, storage, page_id)
+    body = client.get(f"/api/pages/{page_id}/transcription").json()
+    assert body["status"] == "failed" and "500" in body["error"]
+
+
+def test_service_not_running_is_reported(monkeypatch, client, collection, repo, storage):
+    monkeypatch.setattr(config, "HTR_ENABLED", True)
+    monkeypatch.setattr(config, "HTR_SERVICE_URL", "http://127.0.0.1:9")  # nothing listens here
+    _, page_id = _page(client, collection["id"])
+    htr_worker.process_page(repo, storage, page_id)
+    body = client.get(f"/api/pages/{page_id}/transcription").json()
+    assert body["status"] == "failed" and "not reachable" in body["error"]
