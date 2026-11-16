@@ -25,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -38,6 +39,7 @@ from services.storage import ObjectStorage
 logger = logging.getLogger("uvicorn.error")
 
 _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="htr")
+SERVICE_STARTUP_WAIT_SECONDS = 300  # how long to wait for the HTR service to come up
 _active: set[str] = set()  # page ids that are queued or running in THIS process
 _lock = threading.Lock()
 
@@ -72,11 +74,21 @@ def _call_service(image: bytes, filename: str) -> dict:
     """Send one page image to the service. Returns {"page": {...}, "lines": [...]}."""
     content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     try:
-        with httpx.Client(timeout=config.HTR_TIMEOUT_SECONDS) as client:
-            res = client.post(
-                f"{config.HTR_SERVICE_URL}/transcribe",
-                files={"image": (filename, image, content_type)},
-            )
+        # The service needs a minute to load its models after (re)starting. Pages queued
+        # by recover() at startup would otherwise fail with "not reachable".
+        deadline = time.monotonic() + SERVICE_STARTUP_WAIT_SECONDS
+        while True:
+            try:
+                with httpx.Client(timeout=config.HTR_TIMEOUT_SECONDS) as client:
+                    res = client.post(
+                        f"{config.HTR_SERVICE_URL}/transcribe",
+                        files={"image": (filename, image, content_type)},
+                    )
+                break
+            except httpx.ConnectError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(5)
     except httpx.TimeoutException as exc:
         raise HtrError(
             f"Recognition took longer than {config.HTR_TIMEOUT_SECONDS} seconds"
