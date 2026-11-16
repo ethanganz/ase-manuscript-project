@@ -46,6 +46,7 @@ class Repository:
     ) -> None: ...
     def list_page_lines(self, page_id: str) -> list[dict]: ...
     def list_stuck_pages(self) -> list[dict]: ...
+    def replace_page_mentions(self, page_id: str, mentions: list[dict]) -> None: ...
 
     def create_report(
         self, collection_id: str, reporter_id: str, reason: str, details: str | None
@@ -207,6 +208,28 @@ class InMemoryRepository(Repository):
     def list_stuck_pages(self):
         """Pages that were queued or running (the server stopped meanwhile)."""
         return [dict(p) for p in self.pages.values() if p.get("status") in ("queued", "running")]
+
+    def replace_page_mentions(self, page_id, mentions):
+        """Replace the places the map shows for one page."""
+        self.mention_details = [r for r in self.mention_details if r["page_id"] != page_id]
+        page = self.pages[page_id]
+        doc = self.documents[page["document_id"]]
+        for m in mentions:
+            self.mention_details.append(
+                {
+                    "mention_id": str(uuid4()),
+                    "snippet": m["snippet"],
+                    "place_name": m["name"],
+                    "country_code": m["country_code"],
+                    "lat": m["lat"],
+                    "lng": m["lng"],
+                    "page_id": page_id,
+                    "page_number": page["page_number"],
+                    "document_id": doc["id"],
+                    "document_name": doc["original_filename"],
+                    "collection_id": doc["collection_id"],
+                }
+            )
 
     def create_report(self, collection_id, reporter_id, reason, details):
         """Create and store a report."""
@@ -416,6 +439,35 @@ class SupabaseRepository(Repository):
         """Pages that were queued or running (the server stopped meanwhile)."""
         res = self._t("pages").select("*").in_("status", ["queued", "running"]).execute()
         return res.data or []
+
+    def replace_page_mentions(self, page_id, mentions):
+        """Replace the places the map shows for one page."""
+        self._t("place_mentions").delete().eq("page_id", page_id).execute()
+        if not mentions:
+            return
+        # One places row per official place, however many times it is mentioned.
+        places = {
+            m["official_place_id"]: {
+                "official_place_id": m["official_place_id"],
+                "name": m["name"],
+                "country_code": m["country_code"],
+                "lat": m["lat"],
+                "lng": m["lng"],
+            }
+            for m in mentions
+        }
+        saved = (
+            self._t("places")
+            .upsert(list(places.values()), on_conflict="official_place_id")
+            .execute()
+        )
+        ids = {row["official_place_id"]: row["id"] for row in saved.data}
+        rows = [
+            {"place_id": ids[m["official_place_id"]], "page_id": page_id, "snippet": m["snippet"]}
+            for m in mentions
+        ]
+        for start in range(0, len(rows), 200):
+            self._t("place_mentions").insert(rows[start : start + 200]).execute()
 
     def create_report(self, collection_id, reporter_id, reason, details):
         """Create a report in Supabase."""
