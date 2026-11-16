@@ -3,8 +3,9 @@
 How it works
   1. enqueue_page() marks a page "queued" and hands it to ONE background thread
      (one, because every run loads the models and needs a lot of memory).
-  2. The thread downloads the page image from storage into a temporary folder
-     and starts HTR-NLP/scripts/run_page_pipeline.py as a separate program:
+  2. The thread downloads the page image from storage and has it read, either by
+     the HTR-NLP HTTP service (HTR_SERVICE_URL, models stay loaded) or by starting
+     HTR-NLP/scripts/run_page_pipeline.py as a separate program:
         contour line segmentation -> TrOCR (one line at a time) -> place finding
   3. It reads page_response.json, stores one row per line, and marks the page
      "complete". Any problem marks the page "failed" with a readable reason.
@@ -17,6 +18,7 @@ get fixed names, so nothing a user uploads can reach a command line.
 
 import json
 import logging
+import mimetypes
 import os
 import signal
 import subprocess
@@ -26,8 +28,11 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+import httpx
+
 import config
 from database.repository import Repository
+from services import place_linker
 from services.storage import ObjectStorage
 
 logger = logging.getLogger("uvicorn.error")
@@ -61,7 +66,36 @@ def _last_line(text: str) -> str:
 
 
 # --------------------------------------------------------------------------
-# Running the pipeline
+# Option 1: the HTTP service (HTR-NLP/service). Models are loaded once there.
+# --------------------------------------------------------------------------
+def _call_service(image: bytes, filename: str) -> dict:
+    """Send one page image to the service. Returns {"page": {...}, "lines": [...]}."""
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    try:
+        with httpx.Client(timeout=config.HTR_TIMEOUT_SECONDS) as client:
+            res = client.post(
+                f"{config.HTR_SERVICE_URL}/transcribe",
+                files={"image": (filename, image, content_type)},
+            )
+    except httpx.TimeoutException as exc:
+        raise HtrError(
+            f"Recognition took longer than {config.HTR_TIMEOUT_SECONDS} seconds"
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise HtrError("The recognition service is not reachable") from exc
+    if res.status_code != 200:
+        try:
+            detail = res.json().get("detail")
+        except ValueError:
+            detail = None
+        if res.status_code == 422 and isinstance(detail, str):
+            raise HtrError(detail)  # e.g. "No text lines found on this page"
+        raise HtrError(f"The recognition service answered {res.status_code}")
+    return res.json()
+
+
+# --------------------------------------------------------------------------
+# Option 2: run HTR-NLP/scripts/run_page_pipeline.py for every page
 # --------------------------------------------------------------------------
 def _run_pipeline(image: Path, out_dir: Path, page_id: str) -> dict:
     """Run the pipeline on one image file. Returns the parsed page_response.json."""
@@ -136,13 +170,19 @@ def process_page(repo: Repository, storage: ObjectStorage, page_id: str) -> None
         if data is None:
             raise HtrError("The page image file is missing from storage")
 
-        with tempfile.TemporaryDirectory() as work:
-            image = Path(work) / ("page" + (Path(page["image_path"]).suffix or ".png"))
-            image.write_bytes(data)
-            payload = _run_pipeline(image, Path(work) / "result", page_id)
+        filename = "page" + (Path(page["image_path"]).suffix or ".png")
+        if config.HTR_SERVICE_URL:
+            payload = _call_service(data, filename)
+        else:
+            with tempfile.TemporaryDirectory() as work:
+                image = Path(work) / filename
+                image.write_bytes(data)
+                payload = _run_pipeline(image, Path(work) / "result", page_id)
 
         info = payload.get("page", {})
-        repo.save_page_lines(page_id, to_rows(payload), info.get("width"), info.get("height"))
+        rows = to_rows(payload)
+        repo.save_page_lines(page_id, rows, info.get("width"), info.get("height"))
+        place_linker.store_page_places(repo, page_id, rows)  # puts the places on the map
     except HtrError as exc:
         repo.set_page_status(page_id, "failed", str(exc))
     except Exception as exc:
