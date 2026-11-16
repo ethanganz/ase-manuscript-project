@@ -8,9 +8,11 @@ import {
   Expand,
   FileText,
   Flag,
+  Loader2,
   MapPin,
   Maximize2,
   Minimize2,
+  RotateCw,
   Shrink,
   ZoomIn,
   ZoomOut,
@@ -19,12 +21,9 @@ import { useEffect, useState } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
 import { getDocuments, getPages } from "../api/documents.js";
 import { pageImageUrl } from "../api/map.js";
-import {
-  getMockPlaces,
-  getMockTranscription,
-} from "../data/mockTranscriptions.js";
-import { countryDisplayName } from "../libraray/countries.js";
+import { startPageTranscription } from "../api/transcription.js";
 import { useFetch } from "../libraray/useFetch.js";
+import { usePageTranscription } from "../libraray/usePageTranscription.js";
 import { ReportCollectionModal } from "./ReportCollectionModal.jsx";
 
 // On large screens the viewer fills the window below the 76px header (minus
@@ -38,14 +37,6 @@ const PANEL_BAR =
 const ICON_BUTTON =
   "rounded p-1.5 text-[#55615b] transition-colors hover:bg-[#edf1ed] disabled:opacity-30";
 const ZOOM_STEPS = [1, 1.5, 2, 3];
-
-function MockBadge() {
-  return (
-    <span className="shrink-0 rounded-full bg-[#f6efe1] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8a6d3b]">
-      Mock data
-    </span>
-  );
-}
 
 /** Maximize one panel, or go back to both side by side. */
 function FocusButton({ isFocused, onToggle, label }) {
@@ -226,40 +217,177 @@ function PageImagePanel({
   );
 }
 
-/** Wraps every place name in a line with a highlight. */
-function highlightPlaces(line, places) {
-  if (places.length === 0) return line;
-  const pattern = new RegExp(
-    `(${places.map((place) => place.name).join("|")})`,
-    "g",
-  );
-  return line.split(pattern).map((part, index) =>
-    places.some((place) => place.name === part) ? (
+/**
+ * Highlights the place mentions of one line.
+ * Offsets from the server count Unicode characters (not UTF-16 units),
+ * so the text is split with Array.from before cutting.
+ */
+function highlightPlaces(text, mentions) {
+  if (!mentions?.length) return text;
+  const chars = Array.from(text);
+
+  // Merge overlapping mentions so every character is shown once.
+  const spans = [];
+  for (const { start, end } of [...mentions].sort(
+    (a, b) => a.start - b.start || a.end - b.end,
+  )) {
+    const last = spans[spans.length - 1];
+    if (last && start <= last[1]) last[1] = Math.max(last[1], end);
+    else spans.push([start, end]);
+  }
+
+  const parts = [];
+  let cursor = 0;
+  spans.forEach(([start, end], index) => {
+    parts.push(chars.slice(cursor, start).join(""));
+    parts.push(
       <mark key={index} className="rounded bg-[#e3ece5] px-0.5 text-[#1e3b35]">
-        {part}
-      </mark>
-    ) : (
-      part
-    ),
+        {chars.slice(start, end).join("")}
+      </mark>,
+    );
+    cursor = end;
+  });
+  parts.push(chars.slice(cursor).join(""));
+  return parts;
+}
+
+/** Message shown in the transcription panel instead of text. */
+function TranscriptionNotice({ icon: Icon, spin, title, children, action }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+      <Icon className={`size-6 text-[#8a9790] ${spin ? "animate-spin" : ""}`} />
+      <p className="text-sm font-medium text-[#1e302b]">{title}</p>
+      {children && (
+        <p className="max-w-sm text-sm text-[#7e8b85]">{children}</p>
+      )}
+      {action}
+    </div>
   );
 }
 
-/** Right side: the transcription of the current page. */
+/** Right side: what the model read on the current page, one row per line. */
 function TranscriptionPanel({
-  lines,
-  places,
+  transcription,
+  loading,
+  error,
   pageNumber,
+  canTranscribe,
+  onTranscribe,
+  isStarting,
+  startError,
   isFocused,
   onToggleFocus,
 }) {
+  const status = transcription?.status;
+  const lines = transcription?.lines ?? [];
+
+  const startButton = (label) =>
+    canTranscribe && (
+      <button
+        type="button"
+        onClick={onTranscribe}
+        disabled={isStarting}
+        className="mt-2 flex items-center gap-2 rounded-lg bg-[#1e3b35] px-4 py-2 text-sm text-white transition-colors hover:bg-[#2a4d45] disabled:opacity-50"
+      >
+        {isStarting ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <RotateCw className="size-4" />
+        )}
+        {label}
+      </button>
+    );
+
+  let body;
+  if (loading) {
+    body = (
+      <div className="space-y-3 p-4">
+        {[80, 95, 70, 90, 60].map((width) => (
+          <div
+            key={width}
+            style={{ width: `${width}%` }}
+            className="h-4 animate-pulse rounded bg-[#e4ece5]"
+          />
+        ))}
+      </div>
+    );
+  } else if (error) {
+    body = (
+      <TranscriptionNotice icon={FileText} title="Could not load the text">
+        {error}
+      </TranscriptionNotice>
+    );
+  } else if (status === "queued" || status === "running") {
+    body = (
+      <TranscriptionNotice
+        icon={Loader2}
+        spin
+        title={
+          status === "queued" ? "Waiting in line…" : "Reading the handwriting…"
+        }
+      >
+        This can take a few minutes. The text appears here as soon as it is
+        ready.
+      </TranscriptionNotice>
+    );
+  } else if (status === "failed") {
+    body = (
+      <TranscriptionNotice
+        icon={FileText}
+        title="This page could not be transcribed"
+        action={startButton("Try again")}
+      >
+        {transcription.error}
+      </TranscriptionNotice>
+    );
+  } else if (status === "complete" && lines.length === 0) {
+    body = (
+      <TranscriptionNotice icon={FileText} title="No text lines were found">
+        The page was processed, but no handwritten lines were detected.
+      </TranscriptionNotice>
+    );
+  } else if (status === "complete") {
+    body = (
+      <ol className="min-h-0 flex-1 overflow-auto px-4 py-4 font-serif text-[16px] leading-8 text-[#2a3833]">
+        {lines.map((line) => (
+          <li key={line.line_index} className="grid grid-cols-[2rem_1fr] gap-3">
+            <span className="select-none text-right font-sans text-xs leading-8 text-[#b0bab5]">
+              {line.line_index + 1}
+            </span>
+            <span>
+              {line.text ? highlightPlaces(line.text, line.places) : " "}
+            </span>
+          </li>
+        ))}
+      </ol>
+    );
+  } else {
+    body = (
+      <TranscriptionNotice
+        icon={FileText}
+        title="Not transcribed yet"
+        action={startButton("Transcribe this page")}
+      >
+        {canTranscribe
+          ? "Start the handwriting recognition for this page."
+          : "The text of this page is not available yet."}
+      </TranscriptionNotice>
+    );
+  }
+
   return (
     <div className={PANEL}>
       <div className={PANEL_BAR}>
         <p className="truncate text-sm font-medium text-[#1e302b]">
           Transcription · page {pageNumber}
+          {status === "complete" && lines.length > 0 && (
+            <span className="font-normal text-[#8a9790]">
+              {" "}
+              · {lines.length} {lines.length === 1 ? "line" : "lines"}
+            </span>
+          )}
         </p>
         <div className="flex shrink-0 items-center gap-2">
-          <MockBadge />
           <FocusButton
             isFocused={isFocused}
             onToggle={onToggleFocus}
@@ -267,32 +395,58 @@ function TranscriptionPanel({
           />
         </div>
       </div>
-
-      <ol className="min-h-0 flex-1 overflow-auto px-4 py-4 font-serif text-[16px] leading-8 text-[#2a3833]">
-        {lines.map((line, index) => (
-          <li key={index} className="grid grid-cols-[2rem_1fr] gap-3">
-            <span className="select-none text-right font-sans text-xs leading-8 text-[#b0bab5]">
-              {index + 1}
-            </span>
-            <span>{line ? highlightPlaces(line, places) : " "}</span>
-          </li>
-        ))}
-      </ol>
+      {startError && (
+        <p className="shrink-0 bg-[#fbf3f1] px-4 py-2 text-xs text-[#a04a3a]">
+          {startError}
+        </p>
+      )}
+      {body}
     </div>
   );
+}
+
+/**
+ * The places on a page: one entry per distinct mention, with coordinates from
+ * the first candidate that has them. A single candidate is only a suggestion
+ * for review, never a confirmed location, and a mention without coordinates
+ * still counts (it just gets no pin).
+ */
+function collectPlaces(lines) {
+  const found = new Map();
+  for (const line of lines) {
+    for (const mention of line.places ?? []) {
+      const key = mention.text.toLowerCase();
+      if (found.has(key)) continue;
+      const candidates = mention.official_place_candidates ?? [];
+      const located = candidates.find(
+        (c) => c.latitude != null && c.longitude != null,
+      );
+      found.set(key, {
+        name: mention.text,
+        officialName: (located ?? candidates[0])?.canonical_name ?? null,
+        candidateCount: candidates.length,
+        lat: located?.latitude ?? null,
+        lng: located?.longitude ?? null,
+      });
+    }
+  }
+  return [...found.values()];
 }
 
 /** Bottom bar: the places on this page. Collapsed by default; opens a small map. */
 function PlacesBar({ places, mapKey }) {
   const [isOpen, setIsOpen] = useState(false);
   const hasPlaces = places.length > 0;
+  // Only places with coordinates can be pinned. Never invent (0, 0).
+  const pinned = places.filter((place) => place.lat != null);
+  const hasPins = pinned.length > 0;
 
   return (
     <section className="shrink-0 overflow-hidden rounded-xl border border-[#e0e6e0] bg-white">
       <button
         type="button"
         onClick={() => setIsOpen((open) => !open)}
-        disabled={!hasPlaces}
+        disabled={!hasPins}
         aria-expanded={isOpen}
         className="flex h-11 w-full items-center gap-3 px-3 text-left disabled:cursor-default"
       >
@@ -316,8 +470,7 @@ function PlacesBar({ places, mapKey }) {
             </span>
           )}
         </span>
-        <MockBadge />
-        {hasPlaces && (
+        {hasPins && (
           <span className="flex shrink-0 items-center gap-1 text-xs text-[#6e7975]">
             <span className="hidden sm:inline">
               {isOpen ? "Hide map" : "Show map"}
@@ -331,13 +484,13 @@ function PlacesBar({ places, mapKey }) {
         )}
       </button>
 
-      {isOpen && hasPlaces && (
+      {isOpen && hasPins && (
         <div className="grid border-t border-[#edf0ed] md:grid-cols-[1fr_260px]">
           {/* `isolate` keeps Leaflet's high z-indexes below the sticky header. */}
           <div className="isolate h-[200px]">
             <MapContainer
               key={mapKey}
-              bounds={places.map((place) => [place.lat, place.lng])}
+              bounds={pinned.map((place) => [place.lat, place.lng])}
               boundsOptions={{ padding: [40, 40], maxZoom: 8 }}
               scrollWheelZoom={false}
               className="size-full"
@@ -346,7 +499,7 @@ function PlacesBar({ places, mapKey }) {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              {places.map((place) => (
+              {pinned.map((place) => (
                 <CircleMarker
                   key={place.name}
                   center={[place.lat, place.lng]}
@@ -369,10 +522,22 @@ function PlacesBar({ places, mapKey }) {
               <li key={place.name} className="px-4 py-2.5">
                 <p className="text-sm font-medium text-[#1e302b]">
                   {place.name}
+                  {place.officialName && place.officialName !== place.name && (
+                    <span className="font-normal text-[#6e7975]">
+                      {" "}
+                      → {place.officialName}
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-[#8a9790]">
-                  {countryDisplayName(place.country_code)} ·{" "}
-                  {place.lat.toFixed(2)}, {place.lng.toFixed(2)}
+                  {place.candidateCount === 0
+                    ? "No match in the place list"
+                    : place.candidateCount > 1
+                      ? `${place.candidateCount} possible places · to review`
+                      : "One possible place · to review"}
+                  {place.lat != null
+                    ? ` · ${place.lat.toFixed(2)}, ${place.lng.toFixed(2)}`
+                    : " · no coordinates"}
                 </p>
               </li>
             ))}
@@ -434,11 +599,30 @@ export function CollectionViewer({
     Math.max(0, pages.length - 1),
   );
   const pageNumber = pages[pageIndex]?.page_number ?? 1;
+  const pageId = pages[pageIndex]?.id ?? "";
 
-  const transcription = documentId
-    ? getMockTranscription(documentId, pageNumber)
-    : [];
-  const places = documentId ? getMockPlaces(documentId, pageNumber) : [];
+  // What the model read on this page; checked again while it is still working.
+  const transcriptionQuery = usePageTranscription(pageId);
+  const places = collectPlaces(transcriptionQuery.data?.lines ?? []);
+
+  const [isStarting, setIsStarting] = useState(false);
+  const [startError, setStartError] = useState("");
+  const canTranscribe = Boolean(
+    user && collection && collection.owner_id === user.id,
+  );
+
+  async function transcribePage() {
+    setIsStarting(true);
+    setStartError("");
+    try {
+      await startPageTranscription(pageId);
+      transcriptionQuery.reload();
+    } catch (e) {
+      setStartError(e.message);
+    } finally {
+      setIsStarting(false);
+    }
+  }
 
   function changePage(index) {
     setPageIndexByDocument((previous) => ({
@@ -560,16 +744,21 @@ export function CollectionViewer({
             )}
             {focus !== "page" && (
               <TranscriptionPanel
-                lines={transcription}
-                places={places}
+                transcription={transcriptionQuery.data}
+                loading={pagesQuery.loading || transcriptionQuery.loading}
+                error={transcriptionQuery.error}
                 pageNumber={pageNumber}
+                canTranscribe={canTranscribe}
+                onTranscribe={transcribePage}
+                isStarting={isStarting}
+                startError={startError}
                 isFocused={focus === "text"}
                 onToggleFocus={() => toggleFocus("text")}
               />
             )}
           </div>
 
-          <PlacesBar places={places} mapKey={`${documentId}/${pageNumber}`} />
+          <PlacesBar places={places} mapKey={`${pageId}`} />
         </>
       )}
 
