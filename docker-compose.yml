@@ -15,6 +15,22 @@ services:
       - ./backend/.env
     restart: unless-stopped
 
+  htr:
+    # Handwriting recognition for uploaded pages. Opt-in, because the models (about
+    # 3 GB) must be downloaded into HTR-NLP/models first (HTR-NLP/README.md):
+    #   docker compose --profile htr up -d --build
+    # and HTR_SERVICE_URL=http://htr:8000 must be set in backend/.env.
+    # Not published to the host: only the backend talks to it.
+    profiles: ["htr"]
+    build:
+      context: ./HTR-NLP
+      dockerfile: docker/Dockerfile
+    volumes:
+      - ./HTR-NLP/models:/app/models:ro
+    environment:
+      HTR_DEVICE: cpu
+    restart: unless-stopped
+
   frontend:
     # Tag comes from frontend/docker/IMAGE_VERSION via deploy.sh (defaults to :latest).
     image: ghcr.io/ethanganz/ase-manuscript-project-frontend:${FRONTEND_IMAGE_VERSION:-latest}
