@@ -40,6 +40,13 @@ class Repository:
     def list_pages(self, document_id: str) -> list[dict]: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
+    def set_page_status(self, page_id: str, status: str, error: str | None = None) -> None: ...
+    def save_page_lines(
+        self, page_id: str, lines: list[dict], width: int | None, height: int | None
+    ) -> None: ...
+    def list_page_lines(self, page_id: str) -> list[dict]: ...
+    def list_stuck_pages(self) -> list[dict]: ...
+
     def create_report(
         self, collection_id: str, reporter_id: str, reason: str, details: str | None
     ) -> dict: ...
@@ -57,6 +64,7 @@ class InMemoryRepository(Repository):
         self.documents: dict[str, dict] = {}
         self.pages: dict[str, dict] = {}
         self.mention_details: list[dict] = []  # tests put rows here
+        self.page_lines: dict[str, list[dict]] = {}  # page_id -> lines
         self.reports: dict[str, dict] = {}
 
     @staticmethod
@@ -171,6 +179,34 @@ class InMemoryRepository(Repository):
 
     def list_mention_details(self, collection_id):
         return [dict(r) for r in self.mention_details if r["collection_id"] == collection_id]
+
+    def set_page_status(self, page_id, status, error=None):
+        """Change how far the recognition of a page is."""
+        row = self.pages.get(page_id)
+        if row is not None:
+            row.update(status=status, htr_error=error)
+
+    def save_page_lines(self, page_id, lines, width, height):
+        """Replace the stored lines of a page and mark it complete."""
+        self.page_lines[page_id] = [dict(line) for line in lines]
+        row = self.pages.get(page_id)
+        if row is not None:
+            row.update(
+                status="complete",
+                htr_error=None,
+                htr_width=width,
+                htr_height=height,
+                htr_finished_at=self._now(),
+            )
+
+    def list_page_lines(self, page_id):
+        """Return the lines of a page, top to bottom."""
+        rows = [dict(line) for line in self.page_lines.get(page_id, [])]
+        return sorted(rows, key=lambda r: r["line_index"])
+
+    def list_stuck_pages(self):
+        """Pages that were queued or running (the server stopped meanwhile)."""
+        return [dict(p) for p in self.pages.values() if p.get("status") in ("queued", "running")]
 
     def create_report(self, collection_id, reporter_id, reason, details):
         """Create and store a report."""
@@ -345,6 +381,41 @@ class SupabaseRepository(Repository):
                 .order("mention_id")
             )
         )
+
+    def set_page_status(self, page_id, status, error=None):
+        """Change how far the recognition of a page is."""
+        self._t("pages").update({"status": status, "htr_error": error}).eq("id", page_id).execute()
+
+    def save_page_lines(self, page_id, lines, width, height):
+        """Replace the stored lines of a page and mark it complete."""
+        self._t("page_lines").delete().eq("page_id", page_id).execute()
+        rows = [{**line, "page_id": page_id} for line in lines]
+        for start in range(0, len(rows), 200):  # keep each request small
+            self._t("page_lines").insert(rows[start : start + 200]).execute()
+        (
+            self._t("pages")
+            .update(
+                {
+                    "status": "complete",
+                    "htr_error": None,
+                    "htr_width": width,
+                    "htr_height": height,
+                    "htr_finished_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            .eq("id", page_id)
+            .execute()
+        )
+
+    def list_page_lines(self, page_id):
+        """Return the lines of a page, top to bottom."""
+        res = self._t("page_lines").select("*").eq("page_id", page_id).order("line_index").execute()
+        return res.data or []
+
+    def list_stuck_pages(self):
+        """Pages that were queued or running (the server stopped meanwhile)."""
+        res = self._t("pages").select("*").in_("status", ["queued", "running"]).execute()
+        return res.data or []
 
     def create_report(self, collection_id, reporter_id, reason, details):
         """Create a report in Supabase."""
