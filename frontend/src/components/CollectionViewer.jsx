@@ -17,7 +17,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
 import { getDocuments, getPages } from "../api/documents.js";
 import { pageImageUrl } from "../api/map.js";
@@ -37,6 +37,18 @@ const PANEL_BAR =
 const ICON_BUTTON =
   "rounded p-1.5 text-[#55615b] transition-colors hover:bg-[#edf1ed] disabled:opacity-30";
 const ZOOM_STEPS = [1, 1.5, 2, 3];
+
+/** Corner points of a line on the page: its outline, or else its box. */
+function linePoints(line) {
+  if (line.polygon?.length >= 3) {
+    return line.polygon.map(([x, y]) => `${x},${y}`).join(" ");
+  }
+  if (line.bbox?.length === 4) {
+    const [left, top, right, bottom] = line.bbox;
+    return `${left},${top} ${right},${top} ${right},${bottom} ${left},${bottom}`;
+  }
+  return "";
+}
 
 /** Maximize one panel, or go back to both side by side. */
 function FocusButton({ isFocused, onToggle, label }) {
@@ -113,10 +125,59 @@ function PageImagePanel({
   loading,
   isFocused,
   onToggleFocus,
+  lines,
+  pageWidth,
+  pageHeight,
+  activeLine,
+  hoverLine,
+  onSelectLine,
+  onHoverLine,
 }) {
   const [zoom, setZoom] = useState(1); // 1 = whole page fits the panel
   const page = pages[pageIndex];
   const zoomStep = ZOOM_STEPS.indexOf(zoom);
+
+  // Where the picture sits inside the scroll area, so the line overlay can be
+  // laid exactly on top of it (it changes with zoom and window size).
+  const imgRef = useRef(null);
+  const polygonRefs = useRef({});
+  const [box, setBox] = useState(null);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (!img) return undefined;
+    const measure = () => {
+      const next = {
+        left: img.offsetLeft,
+        top: img.offsetTop,
+        width: img.clientWidth,
+        height: img.clientHeight,
+      };
+      setBox((prev) =>
+        prev &&
+        prev.left === next.left &&
+        prev.top === next.top &&
+        prev.width === next.width &&
+        prev.height === next.height
+          ? prev
+          : next,
+      );
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(img);
+    if (img.parentElement) observer.observe(img.parentElement);
+    return () => observer.disconnect();
+  }, [page?.id, zoom, loading]);
+
+  // A line picked in the text: bring it into view on the page.
+  useEffect(() => {
+    if (activeLine?.from !== "text") return;
+    polygonRefs.current[activeLine.index]?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+      behavior: "smooth",
+    });
+  }, [activeLine]);
 
   return (
     <div className={PANEL}>
@@ -187,14 +248,16 @@ function PageImagePanel({
       </div>
 
       <div
-        className={`min-h-0 flex-1 overflow-auto bg-[#f2f4f1] p-3 ${
+        className={`relative min-h-0 flex-1 overflow-auto bg-[#f2f4f1] p-3 ${
           zoom === 1 ? "flex items-center justify-center" : ""
         }`}
       >
         {loading ? (
           <div className="mx-auto h-full w-2/3 animate-pulse rounded bg-[#e4ece5]" />
         ) : page ? (
+          <>
           <img
+            ref={imgRef}
             key={page.id}
             src={pageImageUrl(page.id)}
             alt={`${document.original_filename}, page ${page.page_number}`}
@@ -207,6 +270,48 @@ function PageImagePanel({
               zoom === 1 ? "max-h-full max-w-full object-contain" : "h-auto"
             }`}
           />
+          {box && pageWidth && pageHeight && lines.length > 0 && (
+            <svg
+              viewBox={`0 0 ${pageWidth} ${pageHeight}`}
+              preserveAspectRatio="none"
+              style={{
+                left: box.left,
+                top: box.top,
+                width: box.width,
+                height: box.height,
+              }}
+              className="pointer-events-none absolute"
+            >
+              {lines.map((line) => {
+                const points = linePoints(line);
+                if (!points) return null;
+                const isActive = activeLine?.index === line.line_index;
+                const isHover = hoverLine === line.line_index;
+                return (
+                  <polygon
+                    key={line.line_index}
+                    ref={(el) => {
+                      polygonRefs.current[line.line_index] = el;
+                    }}
+                    points={points}
+                    onClick={() => onSelectLine(line.line_index)}
+                    onMouseEnter={() => onHoverLine(line.line_index)}
+                    onMouseLeave={() => onHoverLine(null)}
+                    vectorEffect="non-scaling-stroke"
+                    strokeWidth={2}
+                    className={`pointer-events-auto cursor-pointer transition-colors ${
+                      isActive
+                        ? "fill-[#d9a520]/30 stroke-[#b8860b]"
+                        : isHover
+                          ? "fill-[#d9a520]/15 stroke-[#b8860b]/60"
+                          : "fill-transparent stroke-transparent"
+                    }`}
+                  />
+                );
+              })}
+            </svg>
+          )}
+          </>
         ) : (
           <p className="text-sm text-[#7e8b85]">
             No pages available for this file.
@@ -277,9 +382,23 @@ function TranscriptionPanel({
   startError,
   isFocused,
   onToggleFocus,
+  activeLine,
+  hoverLine,
+  onSelectLine,
+  onHoverLine,
 }) {
   const status = transcription?.status;
   const lines = transcription?.lines ?? [];
+
+  // A line picked on the page image: bring it into view in the text.
+  const lineRefs = useRef({});
+  useEffect(() => {
+    if (activeLine?.from !== "image") return;
+    lineRefs.current[activeLine.index]?.scrollIntoView({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  }, [activeLine]);
 
   const startButton = (label) =>
     canTranscribe && (
@@ -349,16 +468,44 @@ function TranscriptionPanel({
   } else if (status === "complete") {
     body = (
       <ol className="min-h-0 flex-1 overflow-auto px-4 py-4 font-serif text-[16px] leading-8 text-[#2a3833]">
-        {lines.map((line) => (
-          <li key={line.line_index} className="grid grid-cols-[2rem_1fr] gap-3">
-            <span className="select-none text-right font-sans text-xs leading-8 text-[#b0bab5]">
-              {line.line_index + 1}
-            </span>
-            <span>
-              {line.text ? highlightPlaces(line.text, line.places) : " "}
-            </span>
-          </li>
-        ))}
+        {lines.map((line) => {
+          const isActive = activeLine?.index === line.line_index;
+          const isHover = hoverLine === line.line_index;
+          return (
+            <li
+              key={line.line_index}
+              ref={(el) => {
+                lineRefs.current[line.line_index] = el;
+              }}
+              role="button"
+              tabIndex={0}
+              aria-current={isActive}
+              onClick={() => onSelectLine(line.line_index)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectLine(line.line_index);
+                }
+              }}
+              onMouseEnter={() => onHoverLine(line.line_index)}
+              onMouseLeave={() => onHoverLine(null)}
+              className={`grid cursor-pointer grid-cols-[2rem_1fr] gap-3 rounded-md px-1 transition-colors ${
+                isActive
+                  ? "bg-[#f6e7b8]"
+                  : isHover
+                    ? "bg-[#faf3dc]"
+                    : "hover:bg-[#f4f7f4]"
+              }`}
+            >
+              <span className="select-none text-right font-sans text-xs leading-8 text-[#b0bab5]">
+                {line.line_index + 1}
+              </span>
+              <span>
+                {line.text ? highlightPlaces(line.text, line.places) : " "}
+              </span>
+            </li>
+          );
+        })}
       </ol>
     );
   } else {
@@ -611,6 +758,18 @@ export function CollectionViewer({
     user && collection && collection.owner_id === user.id,
   );
 
+  // The line picked by clicking (stays until clicked again), and the one the
+  // mouse is over. Both are shared by the image and the text.
+  const [selectedLine, setSelectedLine] = useState(null); // { pageId, index, from }
+  const [hoverLine, setHoverLine] = useState(null);
+  const activeLine = selectedLine?.pageId === pageId ? selectedLine : null;
+
+  function selectLine(index, from) {
+    setSelectedLine(
+      activeLine?.index === index ? null : { pageId, index, from },
+    );
+  }
+
   async function transcribePage() {
     setIsStarting(true);
     setStartError("");
@@ -625,6 +784,7 @@ export function CollectionViewer({
   }
 
   function changePage(index) {
+    setHoverLine(null);
     setPageIndexByDocument((previous) => ({
       ...previous,
       [documentId]: index,
@@ -740,6 +900,13 @@ export function CollectionViewer({
                 loading={pagesQuery.loading}
                 isFocused={focus === "page"}
                 onToggleFocus={() => toggleFocus("page")}
+                lines={transcriptionQuery.data?.lines ?? []}
+                pageWidth={transcriptionQuery.data?.width}
+                pageHeight={transcriptionQuery.data?.height}
+                activeLine={activeLine}
+                hoverLine={hoverLine}
+                onSelectLine={(index) => selectLine(index, "image")}
+                onHoverLine={setHoverLine}
               />
             )}
             {focus !== "page" && (
@@ -754,6 +921,10 @@ export function CollectionViewer({
                 startError={startError}
                 isFocused={focus === "text"}
                 onToggleFocus={() => toggleFocus("text")}
+                activeLine={activeLine}
+                hoverLine={hoverLine}
+                onSelectLine={(index) => selectLine(index, "text")}
+                onHoverLine={setHoverLine}
               />
             )}
           </div>
