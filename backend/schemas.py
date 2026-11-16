@@ -138,6 +138,32 @@ class PageOut(BaseModel):
     status: str
 
 
+# One handwritten line of a page, as read by the model.
+class LineOut(BaseModel):
+    line_index: int  # 0 = top line
+    text: str
+    bbox: list[int] | None = None  # [left, top, right, bottom] in pixels of the upright page
+    polygon: list[list[int]] | None = None
+    # Place mentions: start/end (Unicode code points, end exclusive), text,
+    # place_link_status and the full list of official_place_candidates.
+    places: list[dict] = []
+
+
+# What the model read on one page, and how far the reading is.
+class PageTranscriptionOut(BaseModel):
+    page_id: UUID
+    status: str  # pending | queued | running | complete | failed
+    error: str | None = None  # why it failed
+    width: int | None = None  # size of the upright page the line boxes refer to
+    height: int | None = None
+    lines: list[LineOut] = []
+
+
+# Answer to "please transcribe this".
+class TranscribeQueued(BaseModel):
+    queued_pages: int
+
+
 # Result for a single uploaded file.
 class FileResult(BaseModel):
     filename: str
