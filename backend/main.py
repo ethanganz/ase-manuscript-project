@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
-from routes import auth, ask, collections, documents, names, reports
+from routes import ask, auth, collections, documents, names, reports
 from routes import map as map_routes
 
 
