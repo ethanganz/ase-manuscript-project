@@ -39,14 +39,6 @@ const ICON_BUTTON =
   "rounded p-1.5 text-[#55615b] transition-colors hover:bg-[#edf1ed] disabled:opacity-30";
 const ZOOM_STEPS = [1, 1.5, 2, 3];
 
-function MockBadge() {
-  return (
-    <span className="shrink-0 rounded-full bg-[#f6efe1] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8a6d3b]">
-      Mock data
-    </span>
-  );
-}
-
 /** Maximize one panel, or go back to both side by side. */
 function FocusButton({ isFocused, onToggle, label }) {
   return (
@@ -259,7 +251,6 @@ function TranscriptionPanel({
           Transcription · page {pageNumber}
         </p>
         <div className="flex shrink-0 items-center gap-2">
-          <MockBadge />
           <FocusButton
             isFocused={isFocused}
             onToggle={onToggleFocus}
@@ -316,7 +307,6 @@ function PlacesBar({ places, mapKey }) {
             </span>
           )}
         </span>
-        <MockBadge />
         {hasPlaces && (
           <span className="flex shrink-0 items-center gap-1 text-xs text-[#6e7975]">
             <span className="hidden sm:inline">
