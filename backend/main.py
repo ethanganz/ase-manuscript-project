@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import config
-from routes import auth, collections, documents, names, reports
+from routes import auth, ask, collections, documents, names, reports
 from routes import map as map_routes
 
 
@@ -45,3 +45,4 @@ app.include_router(collections.router)
 app.include_router(documents.router)
 app.include_router(map_routes.router)
 app.include_router(reports.router)
+app.include_router(ask.router)

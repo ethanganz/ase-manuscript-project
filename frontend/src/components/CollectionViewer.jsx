@@ -22,7 +22,12 @@ import { CircleMarker, MapContainer, TileLayer, Tooltip } from "react-leaflet";
 import { getDocuments, getPages } from "../api/documents.js";
 import { pageImageUrl } from "../api/map.js";
 import { startPageTranscription } from "../api/transcription.js";
-import { useFetch } from "../libraray/useFetch.js";
+import {
+  getMockPlaces,
+  getMockTranscription,
+} from "../data/mockTranscriptions.js";
+import { countryDisplayName } from "../library/countries.js";
+import { useFetch } from "../library/useFetch.js";
 import { usePageTranscription } from "../libraray/usePageTranscription.js";
 import { ReportCollectionModal } from "./ReportCollectionModal.jsx";
 
