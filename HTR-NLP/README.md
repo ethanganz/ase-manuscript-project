@@ -1,6 +1,6 @@
 # Bullinger HTR and Place Recognition
 
-Recognize cropped manuscript line images with TrOCR, then extract place mentions from the recognized text with pretrained GLiNER and official-source historical name variants.
+Split manuscript pages into line images, transcribe them with TrOCR, and extract place mentions with fine-tuned multilingual BERT and official-source name variants, with GLiNER available as an option.
 
 ## Sources and attribution
 
@@ -21,23 +21,60 @@ git clone https://github.com/sssstong55t-sudo/Bullinger_htr.git
 cd Bullinger_htr
 python3 -m venv .venv-nlp
 .venv-nlp/bin/python -m pip install -r requirements.txt
-.venv-nlp/bin/python scripts/download_model.py
+.venv-nlp/bin/python scripts/download_public_trocr.py
+mkdir -p models
+curl --fail --location --output models/bullinger_mbert_20261022.zip https://github.com/sssstong55t-sudo/Bullinger_htr/releases/download/v1.0.0-mbert-20261022/bullinger_mbert_20261022.zip
+unzip models/bullinger_mbert_20261022.zip -d models
 ```
 
-`download_model.py` downloads the pinned GLiNER snapshot once, requiring network access and approximately 1 GB of cache space. Subsequent place inference runs offline on CPU. A trained **TrOCR checkpoint must be supplied separately**: weights, model config, generation config, tokenizer and image-processor files must be together in the complete directory saved by `save_pretrained`. Keep the model files together; the downloader below installs the complete checkpoint.
+The [October 22 mBERT checkpoint ZIP](https://github.com/sssstong55t-sudo/Bullinger_htr/releases/download/v1.0.0-mbert-20261022/bullinger_mbert_20261022.zip) (about 680 MiB) includes the model and tokenizer used in the whole-page evaluation. Archive SHA-256 is `92cd0da3f00234a9045831ed5ca70c6c7b43d8b310fc681b1df104ed12a88683`.
 
-Download the complete **seed44 DE20 inference checkpoint** from the [model release](https://github.com/sssstong55t-sudo/Bullinger_htr/releases/tag/v1.0.0-seed44-de20):
+`download_public_trocr.py` installs the default [public Bullinger TrOCR checkpoint](https://huggingface.co/pstroe/bullinger-general-model/tree/be32c883a4deb812ab6f461ae79f583c3f9edc53) and its tokenizer. Allow about 2.2 GB for the download. The installer verifies the weights against the evaluation's SHA-256. Transcription runs offline after installation.
+
+## Run a whole page with one Python command
+
+After setup, use the standalone script from the repository root:
 
 ```sh
-.venv-nlp/bin/python scripts/download_htr_checkpoint.py
+.venv-nlp/bin/python scripts/run_page_pipeline.py \
+  --image /absolute/path/letter.jpg \
+  --output-dir outputs/letter_complete \
+  --page-id letter-001 --device auto
 ```
 
-The downloader fetches 20 Release parts, combines them, verifies the fixed archive SHA256 and every checkpoint file, and extracts `models/bullinger_checkpoint/`. Allow approximately 4 GB of free disk space for parts, archive and extracted weights. Verified temporary downloads remain under `models/checkpoint_download/` and can be deleted afterward. Do not delete the extracted checkpoint. The model archive is approximately 1.34 GB and excludes optimizer state. An actual single-image CPU smoke run passed. GLiNER is downloaded separately by `scripts/download_model.py`.
+This runs contour segmentation, the public Bullinger TrOCR checkpoint, mBERT with historical aliases, and modern-place candidate lookup. Use a new output directory each time. `--device auto` chooses CUDA when available, otherwise CPU; use `--device mps` explicitly on a supported Mac. It does not install packages or download models during recognition.
 
+Open `outputs/letter_complete/report.html` to see line images next to the transcription and candidate table. Give `page_response.json` to the web backend, or share `bullinger_page_results.zip`. The ZIP includes the normalized page image, segmentation preview, all line crops, JSON/JSONL predictions, plain transcription, and an HTML report that opens offline. Image paths are relative to the ZIP root after extraction. Candidate IDs, names, nullable coordinates, ambiguous alternatives, and unmatched mentions are preserved.
+
+A fresh 31-line whole-page run and an actual browser ZIP download passed the [artifact checks](docs/REPRODUCTION.md#standalone-python-and-downloaded-zip-check). The script and its messages are in English. See [team integration requirements](docs/TEAM_INTEGRATION.md) before connecting it to the shared website. This command produces results; the website still needs a background worker, result storage, and an API/frontend connection.
 
 ## Run the recognition pipeline
 
-All commands below run from the repository root. Create cropped line images first; page segmentation is outside this pipeline. Use new output filenames for each run to preserve existing predictions.
+All commands below run from the repository root. Use new output paths for each run to preserve existing predictions.
+
+### Step 0: Split a full page into line images (optional)
+
+Give `scripts/page_segmentation_loose.py` a scan of one manuscript page. The splitter runs locally with Pillow, NumPy and SciPy. TrOCR and place recognition weights are only needed for the subsequent recognition steps.
+
+```sh
+.venv-nlp/bin/python scripts/page_segmentation_loose.py \
+  --image /absolute/path/letter.jpg \
+  --output-dir outputs/letter_lines
+```
+
+The default mode estimates page tilt, traces each line's upper and lower edges, and fills pixels outside its polygon with white. Use `--no-contours` for rectangular crops. Both modes expect a new output directory.
+
+- `line_0001.png`, `line_0002.png`, … are numbered from top to bottom.
+- `manifest.json` records the line order, image filenames and `[left, top, right, bottom]` boxes in the EXIF-oriented page. Right and bottom are exclusive. Contour mode also records each `polygon`.
+- `preview.png` marks the detected lines on the page. Check it for split, merged or spurious lines, especially on pages with marginal notes, multiple columns or tightly spaced handwriting.
+
+To transcribe the exported lines in order on macOS or Linux:
+
+```sh
+.venv-nlp/bin/python scripts/transcribe_images.py \
+  --images outputs/letter_lines/line_*.png \
+  --output outputs/letter_htr.jsonl
+```
 
 ### Step 1: Recognize manuscript lines
 
@@ -45,15 +82,13 @@ Provide cropped **line images**, not complete manuscript pages:
 
 ```sh
 .venv-nlp/bin/python scripts/transcribe_images.py \
-  --model-dir models/bullinger_checkpoint \
-  --config configs/htr_inference.json \
   --images /absolute/path/line1.png /absolute/path/line2.png \
   --output outputs/team_htr.jsonl
 ```
 
-`transcribe_images.py` loads your local TrOCR checkpoint, processes each image, generates text and records image identity. It automatically uses CUDA if available, otherwise CPU; `--device cpu` is available. The output file must not already exist.
+`transcribe_images.py` loads the installed public Bullinger TrOCR checkpoint by default, processes each image, generates text and records image identity. It automatically uses CUDA if available, otherwise CPU; `--device cpu` is available. The output file must not already exist.
 
-The default wrapper uses raw eight-beam decoding. To enable local candidate reranking, add `--save-candidates --language de` (or `la`), then run `scripts/rerank_htr.py`. New-image outputs have no measured CER/WER until evaluated against explicit references. See [local reproduction and evaluation](docs/REPRODUCTION.md) for the complete example and provenance limits.
+The default wrapper uses raw eight-beam decoding with a 128-token generation limit. To enable local candidate reranking, add `--save-candidates --language de` (or `la`), then run `scripts/rerank_htr.py`. New-image outputs have no measured CER/WER until evaluated against explicit references. See [local reproduction and evaluation](docs/REPRODUCTION.md) for the complete example and provenance limits.
 
 ### Step 2: Extract place mentions
 
@@ -64,9 +99,22 @@ The default wrapper uses raw eight-beam decoding. To enable local candidate rera
   --output outputs/team_places.jsonl
 ```
 
-`extract_places.py` reads literal recognized text, runs GLiNER plus the two source-backed variant lexicons, and writes place spans. It emits only places; `person` and `organization` labels compete internally to reduce ambiguity. Text is not rewritten or modernized. Each line is processed independently; this wrapper does not reconstruct paragraph context across line boundaries. Historical variants and official-body results may not transfer to noisy HTR text.
+`extract_places.py` defaults to the October 22 mBERT checkpoint with both historical alias lexicons and whole-word filtering. The classifier was fine-tuned on official TEI body `placeName` spans. It runs offline on CPU, reads the literal transcribed text line by line, and writes place spans. To use a different local mBERT checkpoint, pass its directory after `--mbert`.
 
-Offsets are Python character offsets in the exact `text` string, with an exclusive end: `text[start:end]` equals the mention. No geographic coordinates or verified entity identities are generated. Overlapping candidates may remain; these are extraction candidates, not confirmed places.
+Offsets are Python character offsets in the exact `text` string, with an exclusive end, so `text[start:end]` equals the mention. Each mention includes `official_place_candidates` from the bundled historical alias lexicons. Candidates include the official Bullinger place ID, canonical name, source, and any latitude and longitude available in the source record. A missing name or coordinate is returned as JSON `null`. The coordinates refer to the source record and do not certify the identity of the historical mention.
+
+#### Optional GLiNER place recognition
+
+Run `scripts/download_model.py` once to download the pinned GLiNER weights and mDeBERTa encoder configuration and tokenizer (about 1 GB). Then select GLiNER explicitly:
+
+```sh
+.venv-nlp/bin/python scripts/download_model.py
+.venv-nlp/bin/python scripts/extract_places.py --gliner \
+  --input outputs/letter_htr.jsonl \
+  --output outputs/letter_gliner_places.jsonl
+```
+
+The fixed official-text evaluation below runs GLiNER and uses this same download.
 
 ### Input/output record example
 
@@ -74,20 +122,41 @@ Offsets are Python character offsets in the exact `text` string, with an exclusi
 {"line_id":"example-line-1","image":"line1.png","text":"Example literal transcription","text_source":"htr_output"}
 ```
 
-Input requires `line_id` and string `text`. The handwriting command produces both. Additional provenance fields are retained. Empty text is retained with an empty place list. For illustration, a mention object looks like:
+Input requires `line_id` and string `text`. The handwriting command produces both. Additional provenance fields are retained. Empty text is retained with an empty place list. The [saved example](examples/expected_places.jsonl) includes this candidate for `Basileę`:
 
 ```json
-{"start":0,"end":6,"text":"Zurich","sources":["gliner"],"score":0.9}
+{
+  "start": 0,
+  "end": 7,
+  "text": "Basileę",
+  "sources": ["mbert", "official_source_variant"],
+  "place_link_status": "candidate_for_review",
+  "official_place_candidates": [
+    {
+      "official_place_id": "l28",
+      "canonical_name": "Basel",
+      "latitude": 47.55839,
+      "longitude": 7.57327,
+      "source": "https://github.com/stazh/bullinger-korpus-tei"
+    }
+  ]
+}
 ```
 
-This object is a schema example, not an actual scored prediction. A GLiNER score is not a calibrated probability of correctness. Alias-only matches have no GLiNER score.
+- `candidate_for_review` means the lexicons returned one candidate.
+- `ambiguous` means the lexicons returned multiple distinct candidates. Each stays in the array.
+- `unmatched` means the mention has no candidate in the bundled lexicons. Its candidate array is empty.
+
+Model scores are uncalibrated. Alias-only mentions have no model score. The same candidate fields are returned by both place extractors.
 
 ## Entry points
 
 | Command | Purpose | Input | Output |
 |---|---|---|---|
-| `scripts/download_model.py` | Cache the fixed pretrained GLiNER snapshot | Internet access | `.cache/huggingface/` |
-| `scripts/download_htr_checkpoint.py` | Download, assemble and verify the trained TrOCR checkpoint | GitHub Release assets | `models/bullinger_checkpoint/` |
+| `scripts/download_model.py` | Cache optional GLiNER and its encoder tokenizer and configuration | Internet access | `.cache/huggingface/` |
+| `scripts/download_public_trocr.py` | Cache the fixed public Bullinger TrOCR and tokenizer | Hugging Face | `models/bullinger_public_trocr/` |
+| `scripts/run_page_pipeline.py` | Run the complete default pipeline and package results | Page image and installed models | Portable JSON, images, offline report and ZIP |
+| `scripts/page_segmentation_loose.py` | Split one manuscript page into ordered lines | Page image | Line PNGs, manifest and preview |
 | `scripts/transcribe_images.py` | Recognize manuscript line images | Line images and TrOCR checkpoint | HTR text JSONL |
 | `scripts/extract_places.py` | Extract literal place spans | Text JSONL | JSONL with a `places` array |
 | Package `scripts/run_official_ner.py` | Reproduce the fixed official-text evaluation | Included reference corpus | Metrics, predictions and protocol |
@@ -98,11 +167,11 @@ For command-line options, run an entry point with `--help`. The download command
 
 | File | Meaning | Used for |
 |---|---|---|
-| `configs/htr_inference.json` | Beam count, generation length and cache settings | New-image TrOCR command; does not contain weights |
-| Checkpoint `config.json`, `generation_config.json`, tokenizer and processor JSON files | Model architecture and preprocessing metadata | Must accompany real weights inside `--model-dir` |
-| `configs/place_inference.json` | Pinned GLiNER revision, labels, threshold, windowing and lexicon paths | Text-to-place command |
-| `outputs/bullinger_htr_delivery_EN/data/historical_aliases.json` | Official-source historical variants | Adds literal name variants missed by GLiNER |
-| `outputs/bullinger_htr_delivery_EN/data/source_aliases.json` | Additional disjoint source-derived variants | Second lexicon layer |
+| `configs/htr_inference.json` | Beam count, generation length and cache settings | Default public inference enables the generation cache. An explicit `--config` uses the values in that file. |
+| Checkpoint configuration, tokenizer and processor files | Model architecture and preprocessing metadata | Installed with the public checkpoint |
+| `configs/place_inference.json` | Shared lexicon paths and optional GLiNER settings | Text-to-place command |
+| `outputs/bullinger_htr_delivery/data/historical_aliases.json` | Official-source historical variants | Adds literal name variants missed by GLiNER |
+| `outputs/bullinger_htr_delivery/data/source_aliases.json` | Additional disjoint source-derived variants | Second lexicon layer |
 | `outputs/team_htr.jsonl` | One recognized line per record | Bridge from handwriting recognition to place extraction |
 | `outputs/team_places.jsonl` | Text, provenance and detected place spans | Team integration output |
 | Package `results/summary.json` | Saved official annotation-agreement metrics | Reporting only, not an inference configuration |
@@ -115,7 +184,7 @@ JSONL stores one JSON object per line. The two configuration files control infer
 ## Reproduce the official-text evaluation
 
 ```sh
-.venv-nlp/bin/python outputs/bullinger_htr_delivery_EN/scripts/run_official_ner.py \
+.venv-nlp/bin/python outputs/bullinger_htr_delivery/scripts/run_official_ner.py \
   --output-dir outputs/official_ner_run01
 ```
 
@@ -126,11 +195,27 @@ This separate command evaluates **official reference text**, not images or your 
 | Historical frozen HTR test, 500 lines, LM reranked | 13.3917% | 38.6088% | — | — | — |
 | Official annotation agreement, 357 paragraphs, GLiNER + variants | — | — | 82.99% | 61.16% | 70.42% |
 
-These are separate experiments, **not image-to-place end-to-end metrics**. Official annotation completeness is unestablished; unmatched predictions are not automatically true false positives. This official sample is already exposed; further tuning on it is development work. See [fixed comparisons and limitations](outputs/bullinger_htr_delivery_EN/RESULTS.md).
+These are separate experiments, **not image-to-place end-to-end metrics**. Official annotation completeness is unestablished; unmatched predictions are not automatically true false positives. This official sample is already exposed; further tuning on it is development work. See [fixed comparisons and limitations](outputs/bullinger_htr_delivery/RESULTS.md).
+
+## Whole-page evaluation
+
+The evaluation used 10 original manuscript page images from five letters, previously used for the contour comparison. Each contour crop was transcribed with public Bullinger TrOCR at revision `be32c883a4deb812ab6f461ae79f583c3f9edc53`. The two place extractors processed the same 300 transcriptions. The [evaluation package](evaluation/whole_page/) contains the frozen inputs, predictions, and per-page counts. See [reproduction commands](docs/REPRODUCTION.md#reproduce-the-10-page-evaluation) to recompute the scores.
+
+| Stage | Comparison | Result |
+| --- | --- | --- |
+| Segmentation | One-to-one polygon IoU ≥ 0.50 against 290 TEI reference regions | Contour crops matched 251 of 300 outputs (83.67% precision, 86.55% recall, 85.08% F1). The original rectangle and deskewed rectangle methods matched 214 and 219 regions, respectively. |
+| Public TrOCR | Matched lines | 18.94% CER, 35.03% WER |
+| Public TrOCR | Whole pages, charging missing lines as deletions and extra lines as insertions | 36.28% CER, 53.33% WER |
+| GLiNER + historical aliases | Exact place span and LOC category | 70.21% precision, 58.93% recall, 64.08% F1 (33 TP, 14 FP, 23 FN) |
+| mBERT + historical aliases | Exact place span and LOC category | 72.73% precision, 85.71% recall, 78.69% F1 (48 TP, 18 FP, 8 FN) |
+
+On a fixed subset of 18 byte-identical contour crops with usable references, seed44 DE20 scored 19.19% CER and 45.95% WER. Public TrOCR scored 14.34% CER and 36.49% WER. The seed44 comparison is limited to that subset.
+
+The references come from the official edited TEI. Transcription scoring excluded 11 regions without reliable corresponding text. Place scoring also excluded three lines with cross-line locations and used 56 eligible place annotations. Reference spans were automatically projected onto the HTR text, with no manual verification of the projected boundaries. These figures measure annotation agreement for the released mBERT checkpoint with historical aliases on this five-letter sample.
 
 ## Reproduce HTR experiments in Colab
 
-Open [Bullinger_Clean_Colab.ipynb](outputs/bullinger_htr_delivery_EN/Bullinger_Clean_Colab.ipynb) and read [TRAINING.md](outputs/bullinger_htr_delivery_EN/TRAINING.md) first. The notebook defaults to `TASK=None`; explicitly select one task. Existing Drive datasets, checkpoints and saved candidates are required. It is not a self-contained from-scratch run.
+Open [Bullinger_Clean_Colab.ipynb](outputs/bullinger_htr_delivery/Bullinger_Clean_Colab.ipynb) and read [TRAINING.md](outputs/bullinger_htr_delivery/TRAINING.md) first. The notebook defaults to `TASK=None`; explicitly select one task. Existing Drive datasets, checkpoints and saved candidates are required. It is not a self-contained from-scratch run.
 
 | Worker under package `training/` | Purpose |
 |---|---|
@@ -145,9 +230,9 @@ Use validation for choices. Do not tune on the test set or rerun a final test ju
 
 ## Repository scope and verification
 
-Current delivery contains English documentation, inference/experiment code, fixed official data, actual results and provenance. Original German/Latin sources are preserved. Personal review tables, raw image archives, caches and virtual environments are excluded. TrOCR inference weights are distributed as a Release asset rather than in the Git code tree. Obsolete legacy entry points have been removed from the current branch; their earlier versions remain in Git history.
+Current delivery contains English documentation, inference/experiment code, fixed official data, actual results and provenance. Original German/Latin sources are preserved. Personal review tables, raw image archives, caches and virtual environments are excluded. The default TrOCR weights are downloaded from Hugging Face. Obsolete legacy entry points have been removed from the current branch; their earlier versions remain in Git history.
 
-The original packaged official evaluation was fully reproduced offline. Both new team wrappers passed syntax and CLI checks. The text-to-place wrapper completed an offline two-record smoke run including an empty line. The released seed44 DE20 checkpoint was loaded successfully and used for a single-image CPU inference smoke check. No new independent accuracy result is claimed. Dependency versions are not a full cross-platform lockfile. A fresh computer must install dependencies, download the HTR release asset and cache GLiNER. Raw beam inference is distinct from the historical LM-reranked test.
+The original packaged official evaluation was fully reproduced offline. Both new team wrappers passed syntax and CLI checks. The text-to-place wrapper completed an offline two-record smoke run including an empty line. The default public checkpoint was verified with an offline CPU inference smoke check. No new independent accuracy result is claimed. Dependency versions are not a full cross-platform lockfile. A fresh computer must install dependencies and obtain the models selected for inference. Raw beam inference is distinct from the historical LM-reranked test.
 
 ## Local reranking, example and HTR evaluation
 

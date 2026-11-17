@@ -1,10 +1,28 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+import config
 from routes import ask, auth, collections, documents, names, reports
 from routes import map as map_routes
 
-app = FastAPI(title="ASE Manuscript Project")
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    # After a restart, pages that were queued or running continue where they stopped.
+    if config.HTR_ENABLED:
+        from deps import get_repo, get_storage
+        from services import htr_worker
+
+        overrides = application.dependency_overrides  # tests swap in fakes here
+        repo = overrides.get(get_repo, get_repo)()
+        storage = overrides.get(get_storage, get_storage)()
+        htr_worker.recover(repo, storage)
+    yield
+
+
+app = FastAPI(title="ASE Manuscript Project", lifespan=lifespan)
 
 # CORS middleware - change in production
 app.add_middleware(
