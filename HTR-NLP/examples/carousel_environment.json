@@ -1,0 +1,15 @@
+{
+  "python": "3.13.15",
+  "platform": "Windows CPU",
+  "packages": {
+    "torch": "2.15.0+cpu",
+    "transformers": "4.51.0",
+    "huggingface-hub": "0.36.2",
+    "Pillow": "12.3.0",
+    "tokenizers": "0.21.4",
+    "accelerate": "1.15.0"
+  },
+  "checkpoint_release": "v1.0.0-seed44-de20",
+  "checkpoint_archive_sha256": "e701d1ac50d8dd3a40fc101b1ce6f7694d15b709653dbe1c86317105e4a96823",
+  "scope": "Three illustrative sample-train manuscript lines; eight candidates and fixed reranking; not an independent benchmark"
+}

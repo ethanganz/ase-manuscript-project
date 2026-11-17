@@ -4,6 +4,7 @@ import { CollectionSection } from "./components/CollectionSection.jsx";
 import { CreateCollectionModal } from "./components/CreateCollectionModal.jsx";
 import { Header } from "./components/Header.jsx";
 import { Hero } from "./components/Hero.jsx";
+import { BullingerComparison } from "./components/BullingerComparison.jsx";
 // we safely delete these two lines
 // import { ResearchSection } from './components/ResearchSection.jsx'
 // import { collections as sampleCollections, places } from './data/collections.js'
@@ -343,6 +344,7 @@ function App() {
         ) : (
           <>
             <Hero onCreateCollection={openCollectionModal} />
+            <BullingerComparison />
             <CollectionSection
               collections={remoteCollections}
               search={search}

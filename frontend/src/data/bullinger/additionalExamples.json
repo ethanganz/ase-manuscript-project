@@ -1,0 +1,68 @@
+[
+  {
+    "lineId": "examples/6_00_r1l12.png",
+    "language": "la",
+    "reference": "dubitem, sed tantum, ne temere nunc agere videar, nec expeto, ut hanc vel illam",
+    "prediction": "dubitem; sed tantum ne temere nunc agere videar. Nos expecto, ut hanc vel illam",
+    "imageFile": "6_00_r1l12.png",
+    "imageSha256": "015005efc56a945fbd5ea1e923af384d80cb86a6487ae75a2298321d3e3a1cb6",
+    "title": "Letter 6 / Latin / r1l12",
+    "sourceUrl": "https://www.bullinger-digital.ch/letter/6",
+    "sourcePath": "sample-train/la/6_00_r1l12.png",
+    "generation": {
+      "num_beams": 8,
+      "max_new_tokens": 128,
+      "do_sample": false,
+      "use_cache": false
+    },
+    "reranking": {
+      "char_weight": 0.03,
+      "word_weight": 0.03,
+      "training_text_sha256": "8cb52acceb73bf156e2a88b2bed25d7c2c5aa261154a5cbfdcdf034f3ebb2364"
+    }
+  },
+  {
+    "lineId": "examples/7_00_r1l11.png",
+    "language": "de",
+    "reference": "vor zweyen jaren uberantwurt, welche wir achten zu dem",
+    "prediction": "vor zweyen jaren uberantwurt meir achten zu dem",
+    "imageFile": "7_00_r1l11.png",
+    "imageSha256": "b1b706fa9592a3409f06b8215180123995f25d187896c3fde5e3208728360597",
+    "title": "Letter 7 / German / r1l11",
+    "sourceUrl": "https://www.bullinger-digital.ch/letter/7",
+    "sourcePath": "sample-train/de/7_00_r1l11.png",
+    "generation": {
+      "num_beams": 8,
+      "max_new_tokens": 128,
+      "do_sample": false,
+      "use_cache": false
+    },
+    "reranking": {
+      "char_weight": 0.03,
+      "word_weight": 0.03,
+      "training_text_sha256": "8cb52acceb73bf156e2a88b2bed25d7c2c5aa261154a5cbfdcdf034f3ebb2364"
+    }
+  },
+  {
+    "lineId": "examples/9_01_r1l10.png",
+    "language": "de",
+    "reference": "viler dingen nit weniger beschwären dann die andern, so im zuͦgegen ghandlet",
+    "prediction": "viler dange nit weniger beschwaren; dann die andern soß im zuͦ gegen ghandlyt",
+    "imageFile": "9_01_r1l10.png",
+    "imageSha256": "9a8a1365e1e1fab45eb62a460326a2227ca9989c91588c42427ce16636154790",
+    "title": "Letter 9 / German / r1l10",
+    "sourceUrl": "https://www.bullinger-digital.ch/letter/9",
+    "sourcePath": "sample-train/de/9_01_r1l10.png",
+    "generation": {
+      "num_beams": 8,
+      "max_new_tokens": 128,
+      "do_sample": false,
+      "use_cache": false
+    },
+    "reranking": {
+      "char_weight": 0.03,
+      "word_weight": 0.03,
+      "training_text_sha256": "8cb52acceb73bf156e2a88b2bed25d7c2c5aa261154a5cbfdcdf034f3ebb2364"
+    }
+  }
+]
