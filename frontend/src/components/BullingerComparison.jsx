@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Pause, Play } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import example from "../data/bullinger/example.json";
 import additionalExamples from "../data/bullinger/additionalExamples.json";
 import imageUrl from "../data/bullinger/611_01_r1l31.png";
