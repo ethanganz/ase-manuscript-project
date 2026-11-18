@@ -138,6 +138,32 @@ class PageOut(BaseModel):
     status: str
 
 
+# One handwritten line of a page, as read by the model.
+class LineOut(BaseModel):
+    line_index: int  # 0 = top line
+    text: str
+    bbox: list[int] | None = None  # [left, top, right, bottom] in pixels of the upright page
+    polygon: list[list[int]] | None = None
+    # Place mentions: start/end (Unicode code points, end exclusive), text,
+    # place_link_status and the full list of official_place_candidates.
+    places: list[dict] = []
+
+
+# What the model read on one page, and how far the reading is.
+class PageTranscriptionOut(BaseModel):
+    page_id: UUID
+    status: str  # pending | queued | running | complete | failed
+    error: str | None = None  # why it failed
+    width: int | None = None  # size of the upright page the line boxes refer to
+    height: int | None = None
+    lines: list[LineOut] = []
+
+
+# Answer to "please transcribe this".
+class TranscribeQueued(BaseModel):
+    queued_pages: int
+
+
 # Result for a single uploaded file.
 class FileResult(BaseModel):
     filename: str
@@ -169,3 +195,34 @@ class MentionOut(BaseModel):
     page_number: int
     document_id: UUID
     document_name: str
+
+
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+
+    @field_validator("question")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Question cannot be empty")
+        return value
+
+
+class AskSource(BaseModel):
+    """One transcript line the answer is based on, with where to find the page."""
+
+    label: int  # the number used in the answer, e.g. [1]
+    id: UUID
+    page_id: UUID
+    document_id: UUID | None = None
+    page_number: int | None = None
+    language: str | None = None
+    text: str
+
+
+class AskResponse(BaseModel):
+    answer: str
+    sources: list[AskSource]
+    # True only when the answer cites at least one real line.
+    grounded: bool

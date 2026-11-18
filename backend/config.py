@@ -56,3 +56,41 @@ MAX_PDF_PAGES = int(os.getenv("MAX_PDF_PAGES", "500"))
 
 # PDF pages are rendered at 200 DPI
 PDF_RENDER_DPI = int(os.getenv("PDF_RENDER_DPI", "200"))
+
+# --- Handwriting recognition (HTR-NLP) ----------------------------------------
+# Reading handwriting needs PyTorch and about 3 GB of models, so it is NOT part of
+# this backend. Two ways to connect it (pick one):
+#
+#  1. HTTP service (recommended; models load once, works with Docker):
+#       HTR_SERVICE_URL=http://localhost:8000          (docker compose: http://htr:8000)
+#     Start it with HTR-NLP/service (see HTR-NLP/README.md).
+#
+#  2. Run the page script for every page (simple, but reloads the models each time):
+#       HTR_ENABLED=true  (+ HTR_PIPELINE_DIR, HTR_PYTHON below)
+#
+# With neither set, uploaded pages are stored and stay "pending".
+HTR_SERVICE_URL = os.getenv("HTR_SERVICE_URL", "").rstrip("/")
+HTR_ENABLED = bool(HTR_SERVICE_URL) or os.getenv("HTR_ENABLED", "false").lower() == "true"
+
+# Option 2 only: folder with scripts/run_page_pipeline.py and models/.
+HTR_PIPELINE_DIR = Path(os.getenv("HTR_PIPELINE_DIR") or BASE_DIR.parent / "HTR-NLP")
+
+# Option 2 only: Python that has the HTR-NLP requirements installed.
+# Empty = use .venv-nlp inside HTR_PIPELINE_DIR if it exists, else this Python.
+HTR_PYTHON = os.getenv("HTR_PYTHON", "")
+
+# Option 2 only: "auto" picks CUDA when there is a GPU, otherwise CPU. Or: cpu, cuda, mps.
+HTR_DEVICE = os.getenv("HTR_DEVICE", "auto")
+
+# One page may take several minutes on a CPU. After this it is marked failed.
+HTR_TIMEOUT_SECONDS = int(os.getenv("HTR_TIMEOUT_SECONDS", "1800"))
+
+# --- LLM (Gemini) ----------------------------------------------------------
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "")
+
+# How long one request to Gemini may take before it is given up.
+LLM_TIMEOUT_SECONDS = int(os.getenv("LLM_TIMEOUT_SECONDS", "60"))
+# Wait time shown to the user when Gemini says "limit reached" without saying for how long.
+LLM_DEFAULT_RETRY_SECONDS = int(os.getenv("LLM_DEFAULT_RETRY_SECONDS", "60"))

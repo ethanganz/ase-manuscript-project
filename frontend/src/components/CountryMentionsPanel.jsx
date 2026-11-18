@@ -1,5 +1,5 @@
 import { FileText } from "lucide-react";
-import { countryDisplayName } from "../libraray/countries.js";
+import { countryDisplayName } from "../library/countries.js";
 
 /**
  * Right-hand list: every place found in the selected country, grouped by

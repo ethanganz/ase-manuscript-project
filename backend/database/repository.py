@@ -7,6 +7,7 @@ tests use ``InMemoryRepository`` .
 The repository is the only place that touches the database.
 """
 
+import unicodedata
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -38,7 +39,17 @@ class Repository:
     def create_pages(self, pages: list[dict]) -> None: ...
     def get_page(self, page_id: str) -> dict | None: ...
     def list_pages(self, document_id: str) -> list[dict]: ...
+    def upsert_text_lines(self, rows: list[dict]) -> None: ...
+    def search_text_lines(self, words: list[str], collection_id: str, limit: int) -> list[dict]: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
+
+    def set_page_status(self, page_id: str, status: str, error: str | None = None) -> None: ...
+    def save_page_lines(
+        self, page_id: str, lines: list[dict], width: int | None, height: int | None
+    ) -> None: ...
+    def list_page_lines(self, page_id: str) -> list[dict]: ...
+    def list_stuck_pages(self) -> list[dict]: ...
+    def replace_page_mentions(self, page_id: str, mentions: list[dict]) -> None: ...
 
     def create_report(
         self, collection_id: str, reporter_id: str, reason: str, details: str | None
@@ -57,7 +68,9 @@ class InMemoryRepository(Repository):
         self.documents: dict[str, dict] = {}
         self.pages: dict[str, dict] = {}
         self.mention_details: list[dict] = []  # tests put rows here
+        self.page_lines: dict[str, list[dict]] = {}  # page_id -> lines
         self.reports: dict[str, dict] = {}
+        self.text_lines: dict[str, dict] = {}  # keyed by source_line_id
 
     @staticmethod
     def _now() -> str:
@@ -172,6 +185,56 @@ class InMemoryRepository(Repository):
     def list_mention_details(self, collection_id):
         return [dict(r) for r in self.mention_details if r["collection_id"] == collection_id]
 
+    def set_page_status(self, page_id, status, error=None):
+        """Change how far the recognition of a page is."""
+        row = self.pages.get(page_id)
+        if row is not None:
+            row.update(status=status, htr_error=error)
+
+    def save_page_lines(self, page_id, lines, width, height):
+        """Replace the stored lines of a page and mark it complete."""
+        self.page_lines[page_id] = [dict(line) for line in lines]
+        row = self.pages.get(page_id)
+        if row is not None:
+            row.update(
+                status="complete",
+                htr_error=None,
+                htr_width=width,
+                htr_height=height,
+                htr_finished_at=self._now(),
+            )
+
+    def list_page_lines(self, page_id):
+        """Return the lines of a page, top to bottom."""
+        rows = [dict(line) for line in self.page_lines.get(page_id, [])]
+        return sorted(rows, key=lambda r: r["line_index"])
+
+    def list_stuck_pages(self):
+        """Pages that were queued or running (the server stopped meanwhile)."""
+        return [dict(p) for p in self.pages.values() if p.get("status") in ("queued", "running")]
+
+    def replace_page_mentions(self, page_id, mentions):
+        """Replace the places the map shows for one page."""
+        self.mention_details = [r for r in self.mention_details if r["page_id"] != page_id]
+        page = self.pages[page_id]
+        doc = self.documents[page["document_id"]]
+        for m in mentions:
+            self.mention_details.append(
+                {
+                    "mention_id": str(uuid4()),
+                    "snippet": m["snippet"],
+                    "place_name": m["name"],
+                    "country_code": m["country_code"],
+                    "lat": m["lat"],
+                    "lng": m["lng"],
+                    "page_id": page_id,
+                    "page_number": page["page_number"],
+                    "document_id": doc["id"],
+                    "document_name": doc["original_filename"],
+                    "collection_id": doc["collection_id"],
+                }
+            )
+
     def create_report(self, collection_id, reporter_id, reason, details):
         """Create and store a report."""
         row = {
@@ -203,6 +266,44 @@ class InMemoryRepository(Repository):
         for r in self.reports.values():
             if r["collection_id"] in collection_ids and r["read_at"] is None:
                 r["read_at"] = self._now()
+
+    def upsert_text_lines(self, rows):
+        for row in rows:
+            existing = self.text_lines.get(row["source_line_id"])
+            if existing:
+                existing.update(row)  # columns not in ``row`` (such as page_id) stay as they are
+            else:
+                self.text_lines[row["source_line_id"]] = {
+                    "id": str(uuid4()),
+                    "page_id": None,
+                    "created_at": self._now(),
+                    **row,
+                }
+
+    def search_text_lines(self, words, collection_id, limit):
+        # Simplified stand-in for the SQL function: a word matches when it appears in the
+        # line, ignoring case and accents. It does not tolerate misspellings.
+        document_ids = {
+            d["id"] for d in self.documents.values() if d["collection_id"] == collection_id
+        }
+        page_ids = {p["id"] for p in self.pages.values() if p["document_id"] in document_ids}
+        folded_words = {_fold(w) for w in words if w.strip()}
+        hits = []
+        for line in self.text_lines.values():
+            if line.get("page_id") not in page_ids:
+                continue
+            folded = _fold(line["text"])
+            score = float(sum(1 for w in folded_words if w in folded))
+            if score:
+                hits.append({**line, "score": score})
+        hits.sort(key=lambda h: (-h["score"], h["source_line_id"]))
+        return hits[: max(1, min(limit, 100))]
+
+
+def _fold(text: str) -> str:
+    """Lower case without accents: "Zürich" becomes "zurich"."""
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
 class SupabaseRepository(Repository):
@@ -346,6 +447,70 @@ class SupabaseRepository(Repository):
             )
         )
 
+    def set_page_status(self, page_id, status, error=None):
+        """Change how far the recognition of a page is."""
+        self._t("pages").update({"status": status, "htr_error": error}).eq("id", page_id).execute()
+
+    def save_page_lines(self, page_id, lines, width, height):
+        """Replace the stored lines of a page and mark it complete."""
+        self._t("page_lines").delete().eq("page_id", page_id).execute()
+        rows = [{**line, "page_id": page_id} for line in lines]
+        for start in range(0, len(rows), 200):  # keep each request small
+            self._t("page_lines").insert(rows[start : start + 200]).execute()
+        (
+            self._t("pages")
+            .update(
+                {
+                    "status": "complete",
+                    "htr_error": None,
+                    "htr_width": width,
+                    "htr_height": height,
+                    "htr_finished_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            .eq("id", page_id)
+            .execute()
+        )
+
+    def list_page_lines(self, page_id):
+        """Return the lines of a page, top to bottom."""
+        res = self._t("page_lines").select("*").eq("page_id", page_id).order("line_index").execute()
+        return res.data or []
+
+    def list_stuck_pages(self):
+        """Pages that were queued or running (the server stopped meanwhile)."""
+        res = self._t("pages").select("*").in_("status", ["queued", "running"]).execute()
+        return res.data or []
+
+    def replace_page_mentions(self, page_id, mentions):
+        """Replace the places the map shows for one page."""
+        self._t("place_mentions").delete().eq("page_id", page_id).execute()
+        if not mentions:
+            return
+        # One places row per official place, however many times it is mentioned.
+        places = {
+            m["official_place_id"]: {
+                "official_place_id": m["official_place_id"],
+                "name": m["name"],
+                "country_code": m["country_code"],
+                "lat": m["lat"],
+                "lng": m["lng"],
+            }
+            for m in mentions
+        }
+        saved = (
+            self._t("places")
+            .upsert(list(places.values()), on_conflict="official_place_id")
+            .execute()
+        )
+        ids = {row["official_place_id"]: row["id"] for row in saved.data}
+        rows = [
+            {"place_id": ids[m["official_place_id"]], "page_id": page_id, "snippet": m["snippet"]}
+            for m in mentions
+        ]
+        for start in range(0, len(rows), 200):
+            self._t("place_mentions").insert(rows[start : start + 200]).execute()
+
     def create_report(self, collection_id, reporter_id, reason, details):
         """Create a report in Supabase."""
         res = (
@@ -398,3 +563,27 @@ class SupabaseRepository(Repository):
                 .is_("read_at", "null")
                 .execute()
             )
+
+    def upsert_text_lines(self, rows):
+        # In chunks of 500, so one request never gets too large. Columns missing
+        # from a row are left unchanged when the line already exists.
+        for start in range(0, len(rows), 500):
+            self._t("text_lines").upsert(
+                rows[start : start + 500], on_conflict="source_line_id"
+            ).execute()
+
+    def search_text_lines(self, words, collection_id, limit):
+        # Calls the SQL function search_text_lines (see the migration file).
+        res = (
+            self._sb()
+            .rpc(
+                "search_text_lines",
+                {
+                    "query_words": words,
+                    "collection": collection_id,
+                    "max_results": limit,
+                },
+            )
+            .execute()
+        )
+        return res.data or []

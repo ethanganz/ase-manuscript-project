@@ -11,9 +11,51 @@ services:
       dockerfile: docker/Dockerfile
     ports:
       - "3011:3000"
+
     env_file:
       - ./backend/.env
     restart: unless-stopped
+
+  htr-models:
+    # One-time model download (about 3 GB) into the Docker volume "htr-models".
+    # The volume survives `docker compose down` and restarts, so this only
+    # downloads again if you delete it (`docker compose down -v`). On later runs
+    # it finds the models and exits in a second.
+    profiles: ["htr"]
+    image: ase-manuscript-htr:local
+    build:
+      context: ./HTR-NLP
+      dockerfile: docker/Dockerfile
+    user: root
+    command: ["python", "scripts/install_models.py"]
+    volumes:
+      - htr-models:/app/models
+    restart: "no"
+
+  htr:
+    # Handwriting recognition for uploaded pages. Start everything with:
+    #   docker compose --profile htr up --build
+    # and set HTR_SERVICE_URL=http://htr:8000 in backend/.env.
+    # Not published to the host: only the backend talks to it.
+    profiles: ["htr"]
+    image: ase-manuscript-htr:local
+    depends_on:
+      htr-models:
+        condition: service_completed_successfully
+    volumes:
+      - htr-models:/app/models:ro
+    environment:
+      HTR_DEVICE: cpu
+    healthcheck:
+      # Healthy once the models are loaded (can take a minute).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 60s
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
 
   frontend:
     # Tag comes from frontend/docker/IMAGE_VERSION via deploy.sh (defaults to :latest).
@@ -26,3 +68,6 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  htr-models:

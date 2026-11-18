@@ -1,0 +1,12 @@
+.venv*/
+.cache/
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+outputs/official_ner_run*/
+*.safetensors
+*.bin
+*.zip
+*.z[0-9][0-9]
+models/

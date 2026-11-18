@@ -4,6 +4,7 @@ import { CollectionSection } from "./components/CollectionSection.jsx";
 import { CreateCollectionModal } from "./components/CreateCollectionModal.jsx";
 import { Header } from "./components/Header.jsx";
 import { Hero } from "./components/Hero.jsx";
+import { AskSection } from "./components/AskSection.jsx";
 import { BullingerComparison } from "./components/BullingerComparison.jsx";
 // we safely delete these two lines
 // import { ResearchSection } from './components/ResearchSection.jsx'
@@ -353,6 +354,7 @@ function App() {
             />
             {/* <ResearchSection places={places} /> */}
             <MapSection collections={remoteCollections} />
+            <AskSection collections={remoteCollections} />
           </>
         )}
       </div>
