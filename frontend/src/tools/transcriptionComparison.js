@@ -1,4 +1,3 @@
-// Literal Unicode character comparison, matching the HTR evaluator's policy.
 export function compareTranscriptions(reference, prediction) {
   const a = Array.from(reference);
   const b = Array.from(prediction);

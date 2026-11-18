@@ -3,7 +3,6 @@ import { ArrowLeft, ArrowRight, Pause, Play } from "lucide-react";
 import example from "../data/bullinger/example.json";
 import additionalExamples from "../data/bullinger/additionalExamples.json";
 import imageUrl from "../data/bullinger/611_01_r1l31.png";
-import licenseUrl from "../data/bullinger/DATASET_LICENSE?url";
 import { compareTranscriptions } from "../tools/transcriptionComparison.js";
 
 const examples = [
@@ -238,11 +237,6 @@ export function BullingerComparison() {
           Bullinger HTR dataset
         </a>{" "}
         ·{" "}
-        <a href={licenseUrl} className="underline">
-          Dataset license
-        </a>
-        . Original manuscript images and reference transcriptions are preserved
-        unchanged.
       </p>
     </section>
   );

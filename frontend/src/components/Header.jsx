@@ -22,8 +22,8 @@ export function Header({ user, unreadCount = 0, onLogin, onLogout }) {
           <a className="transition-colors hover:text-[#1e2a27]" href="#places">
             Places
           </a>
-          <a className="transition-colors hover:text-[#1e2a27]" href="#about">
-            About
+          <a className="transition-colors hover:text-[#1e2a27]" href="#ask">
+            Ask
           </a>
         </nav>
 
