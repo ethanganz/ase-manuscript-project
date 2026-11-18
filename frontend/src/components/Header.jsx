@@ -1,6 +1,13 @@
 import { Bell } from "lucide-react";
 
-export function Header({ user, unreadCount = 0, onLogin, onLogout }) {
+export function Header({
+  user,
+  comparisonHref,
+  isComparisonOpen,
+  unreadCount = 0,
+  onLogin,
+  onLogout,
+}) {
   return (
     <header className="sticky top-0 z-20 border-b border-[#dfe5df] bg-[#fbfcfa]/95 backdrop-blur">
       <div className="mx-auto flex h-[76px] max-w-[1240px] items-center justify-between px-6 lg:px-8">
@@ -13,17 +20,33 @@ export function Header({ user, unreadCount = 0, onLogin, onLogout }) {
         </a>
 
         <nav
-          className="hidden items-center gap-8 text-sm text-[#6e7975] md:flex"
+          className="flex items-center gap-8 text-sm text-[#6e7975]"
           aria-label="Primary navigation"
         >
-          <a className="font-medium text-[#1e3b35]" href="#collections">
+          <a
+            className="hidden font-medium text-[#1e3b35] md:inline"
+            href="#collections"
+          >
             Collections
           </a>
-          <a className="transition-colors hover:text-[#1e2a27]" href="#places">
+          <a
+            className="hidden transition-colors hover:text-[#1e2a27] md:inline"
+            href="#places"
+          >
             Places
           </a>
-          <a className="transition-colors hover:text-[#1e2a27]" href="#about">
-            About
+          <a
+            className="hidden transition-colors hover:text-[#1e2a27] md:inline"
+            href="#ask"
+          >
+            Ask
+          </a>
+          <a
+            className="transition-colors hover:text-[#1e2a27] aria-[current=page]:font-medium aria-[current=page]:text-[#1e3b35]"
+            href={comparisonHref}
+            aria-current={isComparisonOpen ? "page" : undefined}
+          >
+            Bullinger Comparison
           </a>
         </nav>
 
