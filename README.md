@@ -13,12 +13,12 @@ The frontend calls the backend over HTTP. The backend writes and reads files and
 
 ## Live
 
-The archive page includes a **Bullinger reference comparison** carousel with four
+The header links to a dedicated **Bullinger Comparison** page with four
 manuscript lines from letters 611, 6, 7 and 9 (Latin and German). Each slide shows
 the manuscript image, reference transcription, saved HTR output, optional difference
 highlighting and character error rate. Previous/Next, slide indicators and optional
 autoplay move between manuscripts. Open
-`#bullinger-comparison` to jump to it. The displayed prediction is the recorded
+`#bullinger-comparison` to go directly to the page. The displayed prediction is the recorded
 CPU inference output, not a live recognition request or an independent benchmark.
 Source artifacts are in `HTR-NLP/examples/`; the frontend bundles a copy under
 `frontend/src/data/bullinger/`, including the dataset license. Arbitrary uploaded

@@ -66,9 +66,7 @@ export function BullingerComparison() {
 
   return (
     <section
-      id="bullinger-comparison"
       aria-labelledby="bullinger-heading"
-      className="scroll-mt-24 py-12"
       aria-roledescription="carousel"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -106,18 +104,8 @@ export function BullingerComparison() {
           <p className="text-sm font-medium text-[#476d5b]">
             0{slide + 1} / 0{slides.length} · {slides[slide]}
           </p>
-          <button
-            type="button"
-            className={`${controlClass} disabled:opacity-40`}
-            disabled={examples.length < 2}
-            aria-label={playing ? "Pause presentation" : "Play presentation"}
-            onClick={() => setPlaying((current) => !current)}
-          >
-            {playing ? <Pause size={16} /> : <Play size={16} />}{" "}
-            {playing ? "Pause" : "Play"}
-          </button>
         </div>
-        <div className="overflow-hidden" aria-live={playing ? "off" : "polite"}>
+        <div className="overflow-hidden">
           <div
             className="flex items-stretch transition-transform duration-500 ease-in-out motion-reduce:transition-none"
             style={{ transform: `translateX(-${slide * 100}%)` }}

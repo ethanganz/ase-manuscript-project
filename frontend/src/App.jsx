@@ -31,6 +31,7 @@ const PROFILE_HASH = "#profile";
 // The notifications section on the profile page; the header bell links here.
 const NOTIFICATIONS_HASH = "#notifications";
 const COLLECTION_HASH_PREFIX = "#collection/";
+const BULLINGER_COMPARISON_HASH = "#bullinger-comparison";
 
 // The link in the verification email opens the app at #verify-email/<token>.
 // Read once when the page loads, so it is only sent to the backend once.
@@ -53,6 +54,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [hash, setHash] = useState(window.location.hash);
   const isProfileOpen = hash === PROFILE_HASH || hash === NOTIFICATIONS_HASH;
+  const isBullingerComparisonOpen = hash === BULLINGER_COMPARISON_HASH;
   const openCollectionId = hash.startsWith(COLLECTION_HASH_PREFIX)
     ? hash.slice(COLLECTION_HASH_PREFIX.length)
     : "";
@@ -114,14 +116,14 @@ function App() {
       window.removeEventListener(SESSION_ENDED_EVENT, onSessionEnded);
   }, []);
 
-  // The profile page lives at #profile (or #notifications, scrolled to that
-  // section) and a collection at #collection/<id>; any other hash shows the archive.
+  // Page routes scroll to the top. Section links scroll after the page renders.
   useEffect(() => {
     const onHashChange = () => {
       const { hash: newHash } = window.location;
       setHash(newHash);
       if (
         newHash === PROFILE_HASH ||
+        newHash === BULLINGER_COMPARISON_HASH ||
         newHash.startsWith(COLLECTION_HASH_PREFIX)
       ) {
         window.scrollTo(0, 0);
@@ -281,6 +283,8 @@ function App() {
     <main className="min-h-screen bg-[#f7f8f5] text-[#1e2a27]">
       <Header
         user={user}
+        comparisonHref={BULLINGER_COMPARISON_HASH}
+        isComparisonOpen={isBullingerComparisonOpen}
         unreadCount={unreadReportCount}
         onLogin={() => setIsAuthOpen(true)}
         onLogout={handleLogout}
@@ -342,10 +346,11 @@ function App() {
               )
             }
           />
+        ) : isBullingerComparisonOpen ? (
+          <BullingerComparison />
         ) : (
           <>
             <Hero onCreateCollection={openCollectionModal} />
-            <BullingerComparison />
             <CollectionSection
               collections={remoteCollections}
               search={search}

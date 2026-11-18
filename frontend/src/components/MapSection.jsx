@@ -70,7 +70,8 @@ export function MapSection({ collections }) {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-        <div className="overflow-hidden rounded-xl border border-[#e0e6e0] bg-white p-2">
+        {/* Keep Leaflet's panes and controls below the sticky header. */}
+        <div className="isolate overflow-hidden rounded-xl border border-[#e0e6e0] bg-white p-2">
           <CountryMap
             summaries={summaries}
             selectedCode={selectedCode}
