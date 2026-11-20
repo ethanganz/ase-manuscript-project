@@ -9,10 +9,9 @@ The repository is the only place that touches the database.
 
 import unicodedata
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from database.paging import fetch_all
-from uuid import NAMESPACE_URL, uuid4, uuid5
 
 
 class Repository:
@@ -318,7 +317,8 @@ class InMemoryRepository(Repository):
                 if (line.get("text") or "").strip():
                     rows.append(_page_line_as_text_line(page_id, line))
         return rows[: max(1, limit)]
-    
+
+
 def _page_line_as_text_line(page_id: str, line: dict) -> dict:
     """A recognised page line in the same shape as a ``text_lines`` row."""
     return {
