@@ -115,8 +115,9 @@ export function AskSection({ collections }) {
                 className="resize-y rounded-lg border border-[#d5ddd7] px-3 py-2 font-normal"
               />
               <span className="text-xs font-normal text-[#7e8b85]">
-                {question.length}/{MAX_QUESTION_LENGTH}. The search matches
-                spellings, not meaning, so use words as they appear in the text.
+                {question.length}/{MAX_QUESTION_LENGTH}. Words that appear in the
+                text find the best lines; other questions are answered from a
+                sample of the collection.
               </span>
             </label>
 
