@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -23,6 +24,8 @@ from schemas import (
 from services import htr_worker
 from services.ingest import ingest_upload
 from services.storage import ObjectStorage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/collections", tags=["collections"])
 
@@ -81,6 +84,39 @@ def update_collection(
     if not fields:
         return collection
     return repo.update_collection(str(collection_id), fields)
+
+
+@router.delete("/{collection_id}", status_code=204)
+def delete_collection(
+    collection_id: UUID,
+    repo: Repository = Depends(get_repo),
+    storage: ObjectStorage = Depends(get_storage),
+    user: dict = Depends(get_current_user),
+):
+    """Delete a collection with all its documents, pages and transcriptions.
+
+    Only the owner may do this. The uploaded files are removed from storage too.
+    """
+    collection = require_visible_collection(repo, str(collection_id), user)
+    if collection.get("owner_id") != user["id"]:
+        raise HTTPException(status_code=403, detail="You can only delete your own collections")
+
+    # Collect the file keys first: after the rows are gone they cannot be found anymore.
+    keys: list[str] = []
+    for document in repo.list_documents(str(collection_id)):
+        if document.get("original_path"):
+            keys.append(document["original_path"])
+        keys.extend(p["image_path"] for p in repo.list_pages(document["id"]) if p.get("image_path"))
+
+    repo.delete_collection(str(collection_id))
+
+    # The collection is already gone. A storage problem must not turn that into an error,
+    # so leftover files are only logged.
+    for start in range(0, len(keys), 100):
+        try:
+            storage.remove(keys[start : start + 100])
+        except Exception:
+            logger.exception("Could not remove files of deleted collection %s", collection_id)
 
 
 @router.get("/{collection_id}/documents", response_model=list[DocumentOut])
