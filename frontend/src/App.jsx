@@ -345,6 +345,11 @@ function App() {
                 ),
               )
             }
+            onCollectionDeleted={(deletedId) =>
+              setRemoteCollections((previous) =>
+                previous.filter((collection) => collection.id !== deletedId),
+              )
+            }
           />
         ) : isBullingerComparisonOpen ? (
           <BullingerComparison />
