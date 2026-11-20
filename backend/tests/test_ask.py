@@ -152,6 +152,21 @@ def test_unknown_collection_is_404_and_the_model_is_not_called(client):
     assert ask(client, str(uuid4())).status_code == 404
     assert fake.calls == []
 
+def test_recognised_page_lines_are_used_when_no_text_lines_exist(client, repo, collection):
+    document_id, page_id = str(uuid4()), str(uuid4())
+    repo.create_document({"id": document_id, "collection_id": collection["id"]})
+    repo.create_pages([{"id": page_id, "document_id": document_id, "page_number": 1}])
+    repo.save_page_lines(
+        page_id, [{"line_index": 0, "text": "Rex quidam exul factus"}], 100, 100
+    )
+    fake = use_llm(FakeLLM(reply="A king became an exile [1]."))
+
+    body = ask(client, collection["id"], "Who became an exile?").json()
+
+    assert body["grounded"] is True
+    assert body["sources"][0]["page_id"] == page_id
+    assert "Rex quidam exul factus" in fake.calls[0][1]
+
 
 @pytest.mark.parametrize("question", ["", "   ", "x" * 501])
 def test_bad_questions_are_rejected(client, collection, question):
