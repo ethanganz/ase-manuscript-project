@@ -105,7 +105,7 @@ def transcribe_page(
     if page is None:
         raise HTTPException(status_code=404, detail="Page not found")
     doc = _require_visible_document(repo, page["document_id"], user)
-    # _require_owner(repo, doc["collection_id"], user)
+    _require_owner(repo, doc["collection_id"], user)
     if not config.HTR_ENABLED:
         raise HTTPException(status_code=503, detail="Transcription is not enabled on this server")
     return {"queued_pages": int(htr_worker.enqueue_page(repo, storage, str(page_id)))}
@@ -122,7 +122,7 @@ def transcribe_document(
 ):
     """Queue every page of a document that is not transcribed yet. Owner only."""
     doc = _require_visible_document(repo, document_id, user)
-    # _require_owner(repo, doc["collection_id"], user)
+    _require_owner(repo, doc["collection_id"], user)
     if not config.HTR_ENABLED:
         raise HTTPException(status_code=503, detail="Transcription is not enabled on this server")
     return {"queued_pages": htr_worker.enqueue_document(repo, storage, str(document_id))}
