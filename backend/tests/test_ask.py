@@ -74,8 +74,16 @@ def test_only_lines_of_this_collection_reach_the_model(client, repo, collection)
     assert "in ours" in fake.calls[0][1] and "the other" not in fake.calls[0][1]
 
 
-def test_no_matching_line_does_not_call_the_model(client, repo, collection):
+def test_no_word_match_falls_back_to_the_collection_lines(client, repo, collection):
     add_lines(repo, collection["id"], ["completely different words"])
+    fake = use_llm(FakeLLM(reply="It is about different words [1]."))
+    body = ask(client, collection["id"]).json()
+    assert body["grounded"] is True
+    assert len(fake.calls) == 1
+    assert "completely different words" in fake.calls[0][1]
+
+
+def test_empty_collection_does_not_call_the_model(client, repo, collection):
     fake = use_llm(FakeLLM())
     body = ask(client, collection["id"]).json()
     assert body == {"answer": NO_MATCH, "sources": [], "grounded": False}

@@ -41,6 +41,7 @@ class Repository:
     def list_pages(self, document_id: str) -> list[dict]: ...
     def upsert_text_lines(self, rows: list[dict]) -> None: ...
     def search_text_lines(self, words: list[str], collection_id: str, limit: int) -> list[dict]: ...
+    def list_text_lines(self, collection_id: str, limit: int) -> list[dict]: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
     def set_page_status(self, page_id: str, status: str, error: str | None = None) -> None: ...
@@ -298,6 +299,16 @@ class InMemoryRepository(Repository):
                 hits.append({**line, "score": score})
         hits.sort(key=lambda h: (-h["score"], h["source_line_id"]))
         return hits[: max(1, min(limit, 100))]
+
+    def list_text_lines(self, collection_id, limit):
+        """Transcript lines of a collection in reading order, without any word matching."""
+        document_ids = {
+            d["id"] for d in self.documents.values() if d["collection_id"] == collection_id
+        }
+        page_ids = {p["id"] for p in self.pages.values() if p["document_id"] in document_ids}
+        rows = [dict(l) for l in self.text_lines.values() if l.get("page_id") in page_ids]
+        rows.sort(key=lambda r: r["source_line_id"])
+        return rows[: max(1, limit)]
 
 
 def _fold(text: str) -> str:
@@ -571,6 +582,30 @@ class SupabaseRepository(Repository):
             self._t("text_lines").upsert(
                 rows[start : start + 500], on_conflict="source_line_id"
             ).execute()
+
+    def list_text_lines(self, collection_id, limit):
+        """Transcript lines of a collection in reading order, without any word matching."""
+        page_ids = [
+            page["id"]
+            for document in self.list_documents(collection_id)
+            for page in self.list_pages(document["id"])
+        ]
+        if not page_ids:
+            return []
+        rows: list[dict] = []
+        for start in range(0, len(page_ids), 100):  # chunks keep the request URL short
+            res = (
+                self._t("text_lines")
+                .select("id,page_id,source_line_id,language,text")
+                .in_("page_id", page_ids[start : start + 100])
+                .order("source_line_id")
+                .limit(limit)
+                .execute()
+            )
+            rows.extend(res.data or [])
+            if len(rows) >= limit:
+                break
+        return rows[:limit]
 
     def search_text_lines(self, words, collection_id, limit):
         # Calls the SQL function search_text_lines (see the migration file).

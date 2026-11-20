@@ -20,11 +20,17 @@ from services.text_search import search_lines
 
 logger = logging.getLogger(__name__)
 
-MAX_LINES = 12  # lines given to the model
+
+# When no word of the question matches (for example an English question about Latin
+# text), the model gets this many lines of the collection instead, so it can still
+# answer from the meaning. Larger collections are only sampled.
+FALLBACK_LINES = 150
+
+MAX_LINES = 12 
 MAX_LINE_CHARS = 500  # longer lines are cut
 
 NOT_FOUND = "The documents do not contain an answer to this question."
-NO_MATCH = "No line in this collection matches the words of your question."
+NO_MATCH = "This collection has no transcribed lines to answer from yet."
 UNSOURCED = (
     "The AI did not cite any line, so its answer cannot be checked and is not "
     "shown. Try rephrasing the question."
@@ -77,6 +83,10 @@ def cited_numbers(answer: str, line_count: int) -> list[int]:
 def answer_question(repo: Repository, llm: LLM, collection_id: str, question: str) -> AskResult:
     """Raises ``LLMRateLimited`` or ``LLMUnavailable`` (see ``services.llm``)."""
     lines = search_lines(repo, question, collection_id, limit=MAX_LINES)
+    if not lines:
+        # The words did not match (the text is Latin or German, the question maybe
+        # English). Let the model read a broad part of the collection instead.
+        lines = repo.list_text_lines(collection_id, FALLBACK_LINES)
     if not lines:
         return AskResult(answer=NO_MATCH)  # nothing to ask: do not use up the model's limit
 
