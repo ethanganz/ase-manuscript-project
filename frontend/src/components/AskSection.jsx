@@ -170,7 +170,9 @@ export function AskSection({ collections }) {
                     <h3 className="mb-1 text-xs font-semibold tracking-wide text-[#6b5313] uppercase">
                       From the AI&apos;s own knowledge (not from your documents)
                     </h3>
-                    <p className="whitespace-pre-line">{result.general_answer}</p>
+                    <p className="whitespace-pre-line">
+                      {result.general_answer}
+                    </p>
                   </div>
                 )}
 
