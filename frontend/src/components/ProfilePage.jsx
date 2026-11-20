@@ -10,16 +10,21 @@ import {
   Mail,
   Pencil,
   Plus,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getDocuments, updateCollection } from "../api/documents.js";
+import {
+  deleteCollection,
+  getDocuments,
+  updateCollection,
+} from "../api/documents.js";
 import { reportReasonLabel } from "../api/reports.js";
 import { CollectionPreview, StatCard } from "../tools/helpers.jsx";
 import { formatBytes, formatDate } from "../tools/formatters.js";
 
 // Columns of the "My collections" table. Below `sm` only preview, name, size and edit are shown.
 const TABLE_COLUMNS =
-  "grid grid-cols-[64px_minmax(0,1fr)_auto_32px] items-center gap-4 sm:grid-cols-[64px_minmax(0,1fr)_96px_96px_132px_32px]";
+  "grid grid-cols-[64px_minmax(0,1fr)_auto_68px] items-center gap-4 sm:grid-cols-[64px_minmax(0,1fr)_96px_96px_132px_68px]";
 
 const INPUT =
   "w-full rounded-md border border-[#dfe5df] bg-white px-2.5 py-1.5 outline-none focus:border-[#6f8e7b] disabled:bg-[#f4f6f4]";
@@ -101,8 +106,29 @@ function EditCollectionForm({ collection, onSaved, onCancel }) {
   );
 }
 
-function OwnCollectionRow({ collection, documents, onCollectionUpdated }) {
+function OwnCollectionRow({
+  collection,
+  documents,
+  onCollectionUpdated,
+  onCollectionDeleted,
+}) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  async function handleDelete() {
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteCollection(collection.id);
+      onCollectionDeleted(collection.id);
+    } catch (e) {
+      setDeleteError(e.message);
+      setIsDeleting(false);
+    }
+  }
+
   const documentCount = documents?.length;
   const totalSize = documents?.reduce((sum, doc) => sum + doc.size_bytes, 0);
   const fileTypes = [
@@ -140,6 +166,39 @@ function OwnCollectionRow({ collection, documents, onCollectionUpdated }) {
             </p>
           </>
         )}
+        {isConfirmingDelete && (
+          <div
+            role="alertdialog"
+            className="mt-2 rounded-lg border border-[#e8c5c5] bg-[#fbeeee] px-3 py-2 text-xs text-[#7a2d2d]"
+          >
+            <p>
+              Delete &ldquo;{collection.name}&rdquo; with all its documents and
+              transcriptions? This cannot be undone.
+            </p>
+            {deleteError && <p className="mt-1 font-semibold">{deleteError}</p>}
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="rounded-md bg-[#a33a3a] px-2.5 py-1 font-medium text-white disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting…" : "Delete forever"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsConfirmingDelete(false);
+                  setDeleteError("");
+                }}
+                disabled={isDeleting}
+                className="rounded-md border border-[#d9b5b5] px-2.5 py-1 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         {(fileTypes.length > 0 || collection.is_public === false) && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {collection.is_public === false && (
@@ -169,16 +228,28 @@ function OwnCollectionRow({ collection, documents, onCollectionUpdated }) {
       <span className="hidden text-sm text-[#55615b] sm:block">
         {formatDate(collection.created_at)}
       </span>
-      <button
-        type="button"
-        onClick={() => setIsEditing(true)}
-        disabled={isEditing}
-        className="rounded-md p-1.5 text-[#6e7975] transition-colors hover:bg-[#edf1ed] hover:text-[#1e3b35] disabled:invisible"
-        title="Edit name and description"
-        aria-label={`Edit ${collection.name}`}
-      >
-        <Pencil className="size-4" />
-      </button>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => setIsEditing(true)}
+          disabled={isEditing}
+          className="rounded-md p-1.5 text-[#6e7975] transition-colors hover:bg-[#edf1ed] hover:text-[#1e3b35] disabled:invisible"
+          title="Edit name and description"
+          aria-label={`Edit ${collection.name}`}
+        >
+          <Pencil className="size-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsConfirmingDelete(true)}
+          disabled={isEditing || isConfirmingDelete}
+          className="rounded-md p-1.5 text-[#6e7975] transition-colors hover:bg-[#fbeeee] hover:text-[#a33a3a] disabled:invisible"
+          title="Delete collection"
+          aria-label={`Delete ${collection.name}`}
+        >
+          <Trash2 className="size-4" />
+        </button>
+      </div>
     </li>
   );
 }
@@ -289,6 +360,7 @@ export function ProfilePage({
   onMarkReportsRead,
   onCreateCollection,
   onCollectionUpdated,
+  onCollectionDeleted,
 }) {
   // Documents per collection id; a missing key means still loading.
   const [documentsByCollection, setDocumentsByCollection] = useState({});
@@ -456,6 +528,7 @@ export function ProfilePage({
                   collection={collection}
                   documents={documentsByCollection[collection.id]}
                   onCollectionUpdated={onCollectionUpdated}
+                  onCollectionDeleted={onCollectionDeleted}
                 />
               ))}
             </ul>
