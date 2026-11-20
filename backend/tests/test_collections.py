@@ -60,3 +60,34 @@ def test_only_the_owner_can_edit(client, collection):
 def test_edit_unknown_collection_is_404(client):
     missing = "00000000-0000-0000-0000-000000000000"
     assert client.patch(f"/api/collections/{missing}", json={"name": "x"}).status_code == 404
+
+
+def test_owner_can_delete_a_collection_with_its_data(client, collection, repo, storage):
+    from tests.test_ask import add_lines
+
+    document_id, page_id = add_lines(repo, collection["id"], ["ad Zürich missi"])
+    repo.documents[document_id]["original_path"] = "orig/file.pdf"
+    repo.pages[page_id]["image_path"] = "pages/1.png"
+    storage.objects.update({"orig/file.pdf": b"x", "pages/1.png": b"y"})
+    url = f"/api/collections/{collection['id']}"
+
+    assert client.delete(url).status_code == 204
+
+    assert client.get(url).status_code == 404
+    assert repo.documents == {} and repo.pages == {} and repo.text_lines == {}
+    assert storage.objects == {}
+
+
+def test_only_the_owner_can_delete(client, collection):
+    url = f"/api/collections/{collection['id']}"
+    client.post("/api/auth/logout")
+    assert client.delete(url).status_code == 401
+
+    register_verified(client, email="bob@example.com")
+    assert client.delete(url).status_code == 403
+    assert client.get(url).status_code == 200
+
+
+def test_delete_unknown_collection_is_404(client):
+    missing = "00000000-0000-0000-0000-000000000000"
+    assert client.delete(f"/api/collections/{missing}").status_code == 404

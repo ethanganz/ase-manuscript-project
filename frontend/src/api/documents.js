@@ -69,6 +69,22 @@ export async function updateCollection(collectionId, changes) {
   return data;
 }
 
+/** Delete a collection with all its documents and transcriptions. Only the owner may do this. */
+export async function deleteCollection(collectionId) {
+  const response = await apiFetch(`/api/collections/${collectionId}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(
+      typeof data.detail === "string"
+        ? data.detail
+        : `Could not delete the collection (${response.status})`,
+    );
+  }
+}
+
 export async function uploadFiles(collectionId, files) {
   const formData = new FormData();
   for (const file of files) {

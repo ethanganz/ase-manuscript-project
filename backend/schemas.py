@@ -226,3 +226,6 @@ class AskResponse(BaseModel):
     sources: list[AskSource]
     # True only when the answer cites at least one real line.
     grounded: bool
+    # The answer split by origin. None means that part is empty.
+    document_answer: str | None = None
+    general_answer: str | None = None

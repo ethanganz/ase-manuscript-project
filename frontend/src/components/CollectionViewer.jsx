@@ -759,9 +759,10 @@ export function CollectionViewer({
 
   const [isStarting, setIsStarting] = useState(false);
   const [startError, setStartError] = useState("");
-  const canTranscribe = Boolean(
-    user && collection && collection.owner_id === user.id,
-  );
+  // const canTranscribe = Boolean(
+  //   user && collection && collection.owner_id === user.id,
+  // );
+  const canTranscribe = Boolean(user);
 
   // The line picked by clicking (stays until clicked again), and the one the
   // mouse is over. Both are shared by the image and the text.

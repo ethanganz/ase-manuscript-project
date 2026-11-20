@@ -78,8 +78,8 @@ export function AskSection({ collections }) {
             Ask your documents
           </h2>
           <p className="mt-1 text-sm text-[#7e8b85]">
-            Answers use only the transcribed lines of the collection. Every
-            claim links to its page.
+            Ask anything. Answers say what comes from your documents (with the
+            lines and pages) and what the AI adds from its own knowledge.
           </p>
         </div>
 
@@ -115,8 +115,8 @@ export function AskSection({ collections }) {
                 className="resize-y rounded-lg border border-[#d5ddd7] px-3 py-2 font-normal"
               />
               <span className="text-xs font-normal text-[#7e8b85]">
-                {question.length}/{MAX_QUESTION_LENGTH}. The search matches
-                spellings, not meaning, so use words as they appear in the text.
+                {question.length}/{MAX_QUESTION_LENGTH}. You can ask about the
+                documents or about anything else.
               </span>
             </label>
 
@@ -155,9 +155,26 @@ export function AskSection({ collections }) {
 
             {result && (
               <div aria-live="polite" className="grid gap-4">
-                <div className="rounded-lg bg-[#f3f6f3] px-4 py-3 text-sm leading-relaxed whitespace-pre-line">
-                  {result.answer}
-                </div>
+                {result.document_answer && (
+                  <div className="rounded-lg border border-[#c9dccf] bg-[#f3f6f3] px-4 py-3 text-sm leading-relaxed">
+                    <h3 className="mb-1 text-xs font-semibold tracking-wide text-[#314b3e] uppercase">
+                      From your documents
+                    </h3>
+                    <p className="whitespace-pre-line">
+                      {result.document_answer}
+                    </p>
+                  </div>
+                )}
+                {result.general_answer && (
+                  <div className="rounded-lg border border-[#e6d3a3] bg-[#fbf5e4] px-4 py-3 text-sm leading-relaxed">
+                    <h3 className="mb-1 text-xs font-semibold tracking-wide text-[#6b5313] uppercase">
+                      From the AI&apos;s own knowledge (not from your documents)
+                    </h3>
+                    <p className="whitespace-pre-line">
+                      {result.general_answer}
+                    </p>
+                  </div>
+                )}
 
                 {result.grounded ? (
                   <div>
@@ -201,7 +218,7 @@ export function AskSection({ collections }) {
                   </div>
                 ) : (
                   <p className="text-xs text-[#7e8b85]">
-                    No source lines. This is not an answer from the documents.
+                    Nothing in your documents supports this answer.
                   </p>
                 )}
               </div>
