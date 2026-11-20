@@ -30,6 +30,7 @@ class Repository:
     def list_collections(self) -> list[dict]: ...
     def get_collection(self, collection_id: str) -> dict | None: ...
     def update_collection(self, collection_id: str, fields: dict) -> dict | None: ...
+    def delete_collection(self, collection_id: str) -> None: ...
 
     def create_document(self, doc: dict) -> dict: ...
     def delete_document(self, document_id: str) -> None: ...
@@ -145,6 +146,18 @@ class InMemoryRepository(Repository):
         row.update(fields)
         return dict(row)
 
+    def delete_collection(self, collection_id):
+        """Delete a collection with its documents, pages, lines and reports."""
+        self.collections.pop(collection_id, None)
+        # Mimic ON DELETE CASCADE.
+        for did in [d for d, r in self.documents.items() if r["collection_id"] == collection_id]:
+            self.delete_document(did)
+        for rid in [r for r, row in self.reports.items() if row["collection_id"] == collection_id]:
+            del self.reports[rid]
+        self.mention_details = [
+            r for r in self.mention_details if r.get("collection_id") != collection_id
+        ]
+
     def create_document(self, doc):
         """Create and store a document."""
         row = {**doc, "created_at": self._now()}
@@ -157,6 +170,9 @@ class InMemoryRepository(Repository):
         # Mimic ON DELETE CASCADE.
         for pid in [p for p, r in self.pages.items() if r["document_id"] == document_id]:
             del self.pages[pid]
+            self.page_lines.pop(pid, None)
+            for key in [k for k, l in self.text_lines.items() if l.get("page_id") == pid]:
+                del self.text_lines[key]
 
     def get_document(self, document_id):
         """Return a document by ID."""
@@ -420,6 +436,10 @@ class SupabaseRepository(Repository):
         """Change some fields of a collection. Returns the new row, or None if missing."""
         res = self._t("collections").update(fields).eq("id", collection_id).execute()
         return res.data[0] if res.data else None
+
+    def delete_collection(self, collection_id):
+        """Delete a collection. The database removes its documents, pages, lines and reports."""
+        self._t("collections").delete().eq("id", collection_id).execute()
 
     def create_document(self, doc):
         """Create a document in Supabase."""
