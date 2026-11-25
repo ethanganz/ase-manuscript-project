@@ -9,7 +9,7 @@ The repository is the only place that touches the database.
 
 import unicodedata
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from database.paging import fetch_all
 
@@ -30,6 +30,7 @@ class Repository:
     def list_collections(self) -> list[dict]: ...
     def get_collection(self, collection_id: str) -> dict | None: ...
     def update_collection(self, collection_id: str, fields: dict) -> dict | None: ...
+    def delete_collection(self, collection_id: str) -> None: ...
 
     def create_document(self, doc: dict) -> dict: ...
     def delete_document(self, document_id: str) -> None: ...
@@ -41,6 +42,7 @@ class Repository:
     def list_pages(self, document_id: str) -> list[dict]: ...
     def upsert_text_lines(self, rows: list[dict]) -> None: ...
     def search_text_lines(self, words: list[str], collection_id: str, limit: int) -> list[dict]: ...
+    def list_text_lines(self, collection_id: str, limit: int) -> list[dict]: ...
     def list_mention_details(self, collection_id: str) -> list[dict]: ...
 
     def set_page_status(self, page_id: str, status: str, error: str | None = None) -> None: ...
@@ -144,6 +146,18 @@ class InMemoryRepository(Repository):
         row.update(fields)
         return dict(row)
 
+    def delete_collection(self, collection_id):
+        """Delete a collection with its documents, pages, lines and reports."""
+        self.collections.pop(collection_id, None)
+        # Mimic ON DELETE CASCADE.
+        for did in [d for d, r in self.documents.items() if r["collection_id"] == collection_id]:
+            self.delete_document(did)
+        for rid in [r for r, row in self.reports.items() if row["collection_id"] == collection_id]:
+            del self.reports[rid]
+        self.mention_details = [
+            r for r in self.mention_details if r.get("collection_id") != collection_id
+        ]
+
     def create_document(self, doc):
         """Create and store a document."""
         row = {**doc, "created_at": self._now()}
@@ -156,6 +170,9 @@ class InMemoryRepository(Repository):
         # Mimic ON DELETE CASCADE.
         for pid in [p for p, r in self.pages.items() if r["document_id"] == document_id]:
             del self.pages[pid]
+            self.page_lines.pop(pid, None)
+            for key in [k for k, l in self.text_lines.items() if l.get("page_id") == pid]:
+                del self.text_lines[key]
 
     def get_document(self, document_id):
         """Return a document by ID."""
@@ -299,6 +316,35 @@ class InMemoryRepository(Repository):
         hits.sort(key=lambda h: (-h["score"], h["source_line_id"]))
         return hits[: max(1, min(limit, 100))]
 
+    def list_text_lines(self, collection_id, limit):
+        """Transcript lines of a collection in reading order, without any word matching.
+
+        Uses the imported ``text_lines`` linked to a page and the lines the handwriting
+        recognition saved for uploaded pages (``page_lines``).
+        """
+        document_ids = {
+            d["id"] for d in self.documents.values() if d["collection_id"] == collection_id
+        }
+        page_ids = {p["id"] for p in self.pages.values() if p["document_id"] in document_ids}
+        rows = [dict(l) for l in self.text_lines.values() if l.get("page_id") in page_ids]
+        rows.sort(key=lambda r: r["source_line_id"])
+        for page_id in sorted(page_ids):
+            for line in self.list_page_lines(page_id):
+                if (line.get("text") or "").strip():
+                    rows.append(_page_line_as_text_line(page_id, line))
+        return rows[: max(1, limit)]
+
+
+def _page_line_as_text_line(page_id: str, line: dict) -> dict:
+    """A recognised page line in the same shape as a ``text_lines`` row."""
+    return {
+        "id": line.get("id") or str(uuid5(NAMESPACE_URL, f"{page_id}/{line['line_index']}")),
+        "page_id": page_id,
+        "source_line_id": f"{page_id}-{line['line_index']:05d}",
+        "language": None,
+        "text": line["text"],
+    }
+
 
 def _fold(text: str) -> str:
     """Lower case without accents: "Zürich" becomes "zurich"."""
@@ -390,6 +436,10 @@ class SupabaseRepository(Repository):
         """Change some fields of a collection. Returns the new row, or None if missing."""
         res = self._t("collections").update(fields).eq("id", collection_id).execute()
         return res.data[0] if res.data else None
+
+    def delete_collection(self, collection_id):
+        """Delete a collection. The database removes its documents, pages, lines and reports."""
+        self._t("collections").delete().eq("id", collection_id).execute()
 
     def create_document(self, doc):
         """Create a document in Supabase."""
@@ -571,6 +621,49 @@ class SupabaseRepository(Repository):
             self._t("text_lines").upsert(
                 rows[start : start + 500], on_conflict="source_line_id"
             ).execute()
+
+    def list_text_lines(self, collection_id, limit):
+        """Transcript lines of a collection in reading order, without any word matching.
+
+        Uses the imported ``text_lines`` linked to a page and the lines the handwriting
+        recognition saved for uploaded pages (``page_lines``).
+        """
+        page_ids = [
+            page["id"]
+            for document in self.list_documents(collection_id)
+            for page in self.list_pages(document["id"])
+        ]
+        if not page_ids:
+            return []
+        rows: list[dict] = []
+        for start in range(0, len(page_ids), 100):  # chunks keep the request URL short
+            chunk = page_ids[start : start + 100]
+            res = (
+                self._t("text_lines")
+                .select("id,page_id,source_line_id,language,text")
+                .in_("page_id", chunk)
+                .order("source_line_id")
+                .limit(limit)
+                .execute()
+            )
+            rows.extend(res.data or [])
+            res = (
+                self._t("page_lines")
+                .select("id,page_id,line_index,text")
+                .in_("page_id", chunk)
+                .order("page_id")
+                .order("line_index")
+                .limit(limit)
+                .execute()
+            )
+            rows.extend(
+                _page_line_as_text_line(line["page_id"], line)
+                for line in (res.data or [])
+                if (line.get("text") or "").strip()
+            )
+            if len(rows) >= limit:
+                break
+        return rows[:limit]
 
     def search_text_lines(self, words, collection_id, limit):
         # Calls the SQL function search_text_lines (see the migration file).
