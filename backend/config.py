@@ -85,7 +85,16 @@ HTR_DEVICE = os.getenv("HTR_DEVICE", "auto")
 # One page may take several minutes on a CPU. After this it is marked failed.
 HTR_TIMEOUT_SECONDS = int(os.getenv("HTR_TIMEOUT_SECONDS", "1800"))
 
-# --- LLM (Gemini) ----------------------------------------------------------
+# --- LLM (Gemini, or a local model through Ollama) --------------------------
+
+# Which model answers questions: "gemini" (default) or "ollama" (free, runs in Docker).
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+
+# Ollama (only used when LLM_PROVIDER=ollama). In Docker Compose the address is
+# http://ollama:11434. A CPU can need minutes for one answer, so the time limit is longer.
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "300"))
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "")

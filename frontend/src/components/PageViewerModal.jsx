@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { pageImageUrl } from "../api/map.js";
-import { usePageTranscription } from "../libraray/usePageTranscription.js";
+import { usePageTranscription } from "../library/usePageTranscription.js";
 
 // Same length the backend uses when it stores a mention's snippet
 // (place_linker.SNIPPET_CHARS). Python cuts by Unicode characters.

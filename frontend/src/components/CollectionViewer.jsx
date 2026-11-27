@@ -29,7 +29,7 @@ import { startPageTranscription } from "../api/transcription.js";
 // } from "../data/mockTranscriptions.js";
 // import { countryDisplayName } from "../library/countries.js";
 import { useFetch } from "../library/useFetch.js";
-import { usePageTranscription } from "../libraray/usePageTranscription.js";
+import { usePageTranscription } from "../library/usePageTranscription.js";
 import { PageChat } from "./PageChat.jsx";
 import { ReportCollectionModal } from "./ReportCollectionModal.jsx";
 
