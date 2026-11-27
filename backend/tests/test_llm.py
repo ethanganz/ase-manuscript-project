@@ -1,7 +1,9 @@
 """Tests for the Gemini wrapper. A stub replaces the real Gemini client: no network, no key."""
 
+import json
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from google.genai import errors
 
@@ -12,6 +14,7 @@ from services.llm import (
     GeminiLLM,
     LLMRateLimited,
     LLMUnavailable,
+    OllamaLLM,
     default_llm,
     is_daily_limit,
     parse_retry_after,
@@ -205,3 +208,51 @@ def test_manual_check_reports_the_wait_time(monkeypatch, capsys):
 
 
 # pytest tests/test_llm.py -v
+
+
+# --- Ollama (local model) -----------------------------------------------------------
+
+def ollama(handler):
+    client = httpx.Client(base_url="http://ollama:11434", transport=httpx.MockTransport(handler))
+    return OllamaLLM("http://ollama:11434", "llama3.2:3b", client=client)
+
+
+def test_ollama_sends_system_and_prompt_and_returns_the_answer():
+    seen = {}
+
+    def handler(request):
+        seen["url"] = str(request.url)
+        seen["body"] = json.loads(request.content)
+        return httpx.Response(200, json={"message": {"role": "assistant", "content": " hello "}})
+
+    assert ollama(handler).generate("SYS", "PROMPT") == "hello"
+    assert seen["url"] == "http://ollama:11434/api/chat"
+    assert seen["body"]["model"] == "llama3.2:3b" and seen["body"]["stream"] is False
+    assert seen["body"]["messages"] == [
+        {"role": "system", "content": "SYS"},
+        {"role": "user", "content": "PROMPT"},
+    ]
+
+
+def test_ollama_model_not_installed_is_reported_clearly():
+    llm = ollama(lambda request: httpx.Response(404, json={"error": "model not found"}))
+    with pytest.raises(LLMUnavailable, match="not installed"):
+        llm.generate("s", "p")
+
+
+def test_ollama_not_running_or_empty_answer_is_llm_unavailable():
+    def down(request):
+        raise httpx.ConnectError("refused")
+
+    with pytest.raises(LLMUnavailable):
+        ollama(down).generate("s", "p")
+    empty = ollama(lambda request: httpx.Response(200, json={"message": {"content": ""}}))
+    with pytest.raises(LLMUnavailable):
+        empty.generate("s", "p")
+
+
+def test_default_llm_uses_ollama_when_chosen(monkeypatch):
+    default_llm.cache_clear()
+    monkeypatch.setattr(config, "LLM_PROVIDER", "ollama")
+    assert isinstance(default_llm(), OllamaLLM)
+    default_llm.cache_clear()
