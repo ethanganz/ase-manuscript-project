@@ -1,4 +1,5 @@
-// Calls the "ask a question" endpoint of the backend.
+// Calls the "ask a question about one page" endpoint of the backend.
+import { apiFetch } from "./auth.js";
 
 /** Error with the extra facts the screen needs to show a good message. */
 export class AskError extends Error {
@@ -29,20 +30,19 @@ function readMessage(detail, status) {
 }
 
 /**
- * Ask a question about one collection.
- * Resolves with { answer, sources, grounded }. Rejects with an AskError.
+ * Ask a question about one page.
+ *   history: the last chat messages, oldest first: [{ role: "user" | "assistant", text }]
+ * Resolves with { answer, sources, grounded, document_answer, general_answer }.
+ * Rejects with an AskError.
  */
-export async function askQuestion(collectionId, question) {
+export async function askPage(pageId, question, history = []) {
   let response;
   try {
-    response = await fetch(
-      `/api/collections/${encodeURIComponent(collectionId)}/ask`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
-      },
-    );
+    response = await apiFetch(`/api/pages/${encodeURIComponent(pageId)}/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, history }),
+    });
   } catch {
     throw new AskError(
       "Could not reach the server. Check your connection and try again.",
