@@ -14,6 +14,7 @@ import {
   Minimize2,
   RotateCw,
   Shrink,
+  Sparkles,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -29,6 +30,7 @@ import { startPageTranscription } from "../api/transcription.js";
 // import { countryDisplayName } from "../library/countries.js";
 import { useFetch } from "../library/useFetch.js";
 import { usePageTranscription } from "../libraray/usePageTranscription.js";
+import { PageChat } from "./PageChat.jsx";
 import { ReportCollectionModal } from "./ReportCollectionModal.jsx";
 
 // On large screens the viewer fills the window below the 76px header (minus
@@ -718,6 +720,7 @@ export function CollectionViewer({
   const [pageIndexByDocument, setPageIndexByDocument] = useState({});
   const [focus, setFocus] = useState("both"); // 'both' | 'page' | 'text'
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Full screen: stop the page behind from scrolling, and leave with Escape.
   useEffect(() => {
@@ -789,6 +792,13 @@ export function CollectionViewer({
     }
   }
 
+  // The chat can only answer once the page has been read.
+  const isPageReady = transcriptionQuery.data?.status === "complete";
+
+  function jumpToLine(index) {
+    setSelectedLine({ pageId, index, from: "text" });
+  }
+
   function changePage(index) {
     setHoverLine(null);
     setPageIndexByDocument((previous) => ({
@@ -854,6 +864,17 @@ export function CollectionViewer({
           >
             <Flag className="size-4" />
             <span className="hidden sm:inline">Report</span>
+          </button>
+        )}
+        {selectedDocument && (
+          <button
+            type="button"
+            onClick={() => setIsChatOpen(true)}
+            className="flex shrink-0 items-center gap-2 rounded-lg bg-gradient-to-br from-[#4f7a65] to-[#2f5645] px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-all hover:shadow-md"
+            title="Ask the AI about this page"
+          >
+            <Sparkles className="size-4" />
+            <span className="hidden sm:inline">Ask AI</span>
           </button>
         )}
         <button
@@ -937,6 +958,17 @@ export function CollectionViewer({
 
           <PlacesBar places={places} mapKey={`${pageId}`} />
         </>
+      )}
+
+      {isChatOpen && selectedDocument && (
+        <PageChat
+          pageId={pageId}
+          pageNumber={pageNumber}
+          documentName={selectedDocument.original_filename}
+          ready={isPageReady}
+          onClose={() => setIsChatOpen(false)}
+          onJumpToLine={jumpToLine}
+        />
       )}
 
       {isReporting && collection && (
