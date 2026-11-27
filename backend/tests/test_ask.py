@@ -1,4 +1,4 @@
-"""Tests for the ask endpoint. A fake model replaces Gemini: no network, no key, no cost."""
+"""Tests for the page chat endpoint. A fake model replaces Gemini: no network, no key, no cost."""
 
 from uuid import uuid4
 
@@ -7,11 +7,7 @@ import pytest
 import config
 from deps import get_llm
 from main import app
-from services.ask import (
-    SYSTEM_INSTRUCTION,
-    build_prompt,
-    cited_numbers,
-)
+from services.ask import MAX_HISTORY, SYSTEM_INSTRUCTION, build_prompt, cited_numbers
 from services.llm import FakeLLM, LLMRateLimited, LLMUnavailable, default_llm
 
 
@@ -20,25 +16,30 @@ def use_llm(fake):
     return fake
 
 
-def add_lines(repo, collection_id, texts):
-    """Create one document with one page in the collection and link the lines to that page."""
+def add_page(repo, collection_id, texts, status="complete"):
+    """Create one document with one transcribed page. Returns (document_id, page_id)."""
     document_id, page_id = str(uuid4()), str(uuid4())
     repo.create_document({"id": document_id, "collection_id": collection_id})
     repo.create_pages([{"id": page_id, "document_id": document_id, "page_number": 3}])
-    repo.upsert_text_lines(
-        [
-            {"source_line_id": f"{page_id}-{i}", "text": text, "language": "la"}
-            for i, text in enumerate(texts)
-        ]
-    )
-    for line in repo.text_lines.values():
-        if line["source_line_id"].startswith(page_id):
-            line["page_id"] = page_id
+    if texts:
+        repo.save_page_lines(
+            page_id,
+            [
+                {"id": str(uuid4()), "line_index": i, "text": text, "language": "la"}
+                for i, text in enumerate(texts)
+            ],
+            100,
+            100,
+        )
+    repo.set_page_status(page_id, status)
     return document_id, page_id
 
 
-def ask(client, collection_id, question="Who writes about Zurich?"):
-    return client.post(f"/api/collections/{collection_id}/ask", json={"question": question})
+def ask(client, page_id, question="Who writes about Zurich?", history=None):
+    body = {"question": question}
+    if history is not None:
+        body["history"] = history
+    return client.post(f"/api/pages/{page_id}/ask", json=body)
 
 
 DOC = "FROM THE DOCUMENTS:"
@@ -46,12 +47,12 @@ GEN = "FROM GENERAL KNOWLEDGE:"
 
 
 def test_answer_is_split_into_documents_and_own_knowledge(client, repo, collection):
-    document_id, page_id = add_lines(repo, collection["id"], ["ad Zürich missi", "nothing here"])
+    document_id, page_id = add_page(repo, collection["id"], ["ad Zürich missi", "nothing here"])
     fake = use_llm(
         FakeLLM(reply=f"{DOC}\nZürich is mentioned [1].\n\n{GEN}\nZürich is a city in Switzerland.")
     )
 
-    response = ask(client, collection["id"])
+    response = ask(client, page_id)
 
     assert response.status_code == 200
     body = response.json()
@@ -61,74 +62,93 @@ def test_answer_is_split_into_documents_and_own_knowledge(client, repo, collecti
     source = body["sources"][0]
     assert source["label"] == 1 and source["text"] == "ad Zürich missi"
     assert source["page_id"] == page_id and source["document_id"] == document_id
-    assert source["page_number"] == 3
+    assert source["page_number"] == 3 and source["line_index"] == 0
     system, prompt = fake.calls[0]
     assert system == SYSTEM_INSTRUCTION
-    assert "[1] ad Zürich missi" in prompt and prompt.endswith("Question: Who writes about Zurich?")
+    assert "[1] ad Zürich missi" in prompt
+    assert prompt.endswith("New question: Who writes about Zurich?")
 
 
-def test_only_lines_of_this_collection_reach_the_model(client, repo, collection):
-    other = client.post("/api/collections", json={"name": "Other"}).json()
-    add_lines(repo, collection["id"], ["Zürich in ours"])
-    add_lines(repo, other["id"], ["Zürich in the other"])
+def test_only_lines_of_this_page_reach_the_model(client, repo, collection):
+    add_page(repo, collection["id"], ["line of another page"])
+    _, page_id = add_page(repo, collection["id"], ["line of this page"])
     fake = use_llm(FakeLLM(reply=f"{DOC}\nok [1]\n{GEN}\nnone"))
 
-    ask(client, collection["id"])
+    ask(client, page_id)
 
-    assert "in ours" in fake.calls[0][1] and "the other" not in fake.calls[0][1]
-
-
-def test_question_without_matching_words_still_reaches_the_model(client, repo, collection):
-    add_lines(repo, collection["id"], ["completely different words"])
-    fake = use_llm(FakeLLM(reply=f"{DOC}\nIt is about different words [1].\n{GEN}\nnone"))
-    body = ask(client, collection["id"], "Zzzz qqqq?").json()
-    assert body["grounded"] is True
-    assert "completely different words" in fake.calls[0][1]
+    assert "line of this page" in fake.calls[0][1] and "another page" not in fake.calls[0][1]
 
 
-def test_recognised_page_lines_are_used_when_no_text_lines_exist(client, repo, collection):
-    document_id, page_id = str(uuid4()), str(uuid4())
-    repo.create_document({"id": document_id, "collection_id": collection["id"]})
-    repo.create_pages([{"id": page_id, "document_id": document_id, "page_number": 1}])
-    repo.save_page_lines(page_id, [{"line_index": 0, "text": "Rex quidam exul factus"}], 100, 100)
-    fake = use_llm(FakeLLM(reply=f"{DOC}\nA king became an exile [1].\n{GEN}\nnone"))
+def test_only_the_last_messages_of_the_chat_are_sent(client, repo, collection):
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
+    fake = use_llm(FakeLLM(reply=f"{DOC}\nok [1]\n{GEN}\nnone"))
+    history = [
+        {"role": "user" if i % 2 == 0 else "assistant", "text": f"message {i}"} for i in range(6)
+    ]
 
-    body = ask(client, collection["id"], "Who became an exile?").json()
+    assert ask(client, page_id, history=history).status_code == 200
 
-    assert body["grounded"] is True and body["sources"][0]["page_id"] == page_id
-    assert "Rex quidam exul factus" in fake.calls[0][1]
+    prompt = fake.calls[0][1]
+    assert MAX_HISTORY == 4
+    assert "message 0" not in prompt and "message 1" not in prompt
+    assert "User: message 2" in prompt and "Assistant: message 5" in prompt
+    # the page text comes first so the start of the prompt is the same in every turn
+    assert prompt.index("[1] ad Zürich missi") < prompt.index("User: message 2")
 
 
-def test_any_question_is_answered_even_when_the_collection_is_empty(client, repo, collection):
+def test_a_chat_with_no_history_has_no_history_section(client, repo, collection):
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
+    fake = use_llm(FakeLLM(reply=f"{DOC}\nok [1]\n{GEN}\nnone"))
+    ask(client, page_id)
+    assert "Earlier messages" not in fake.calls[0][1]
+
+
+def test_bad_history_is_rejected(client, repo, collection):
+    _, page_id = add_page(repo, collection["id"], ["x"])
+    use_llm(FakeLLM())
+    assert ask(client, page_id, history=[{"role": "system", "text": "hi"}]).status_code == 422
+
+
+def test_any_question_is_answered_even_when_the_page_has_no_lines(client, repo, collection):
+    _, page_id = add_page(repo, collection["id"], [])
     fake = use_llm(FakeLLM(reply=f"{DOC}\nnone\n{GEN}\nParis is the capital of France."))
-    body = ask(client, collection["id"], "What is the capital of France?").json()
+    body = ask(client, page_id, "What is the capital of France?").json()
     assert body["general_answer"] == "Paris is the capital of France."
     assert body["document_answer"] is None and body["sources"] == [] and body["grounded"] is False
-    assert len(fake.calls) == 1 and "no transcribed lines" in fake.calls[0][1]
+    assert len(fake.calls) == 1
+
+
+def test_a_page_that_is_not_transcribed_is_409_and_the_model_is_not_called(
+    client, repo, collection
+):
+    _, page_id = add_page(repo, collection["id"], [], status="queued")
+    fake = use_llm(FakeLLM())
+    assert ask(client, page_id).status_code == 409
+    assert fake.calls == []
 
 
 def test_a_document_claim_without_a_valid_citation_is_not_shown_as_from_the_documents(
     client, repo, collection
 ):
-    add_lines(repo, collection["id"], ["ad Zürich missi"])
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
     use_llm(FakeLLM(reply=f"{DOC}\nZürich is in Switzerland [7].\n{GEN}\nnone"))  # no line 7
-    body = ask(client, collection["id"]).json()
+    body = ask(client, page_id).json()
     assert body["document_answer"] is None and body["sources"] == [] and body["grounded"] is False
 
 
 def test_a_reply_that_ignores_the_format_counts_as_general_knowledge(client, repo, collection):
-    add_lines(repo, collection["id"], ["ad Zürich missi"])
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
     use_llm(FakeLLM(reply="Just some text [1]."))
-    body = ask(client, collection["id"]).json()
+    body = ask(client, page_id).json()
     assert body["general_answer"] == "Just some text [1]."
     assert body["sources"] == [] and body["grounded"] is False
 
 
 def test_rate_limit_becomes_429_with_wait_time_and_header(client, repo, collection):
-    add_lines(repo, collection["id"], ["ad Zürich missi"])
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
     use_llm(FakeLLM(error=LLMRateLimited(32)))
 
-    response = ask(client, collection["id"])
+    response = ask(client, page_id)
 
     assert response.status_code == 429
     assert response.headers["Retry-After"] == "32"
@@ -138,44 +158,46 @@ def test_rate_limit_becomes_429_with_wait_time_and_header(client, repo, collecti
 
 
 def test_daily_limit_message_does_not_promise_a_wait_time(client, repo, collection):
-    add_lines(repo, collection["id"], ["ad Zürich missi"])
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
     use_llm(FakeLLM(error=LLMRateLimited(3600, daily=True)))
-    detail = ask(client, collection["id"]).json()["detail"]
+    detail = ask(client, page_id).json()["detail"]
     assert detail["daily"] is True and "daily" in detail["message"]
     assert "3600" not in detail["message"]
 
 
 def test_model_failure_becomes_503_with_a_safe_message(client, repo, collection):
-    add_lines(repo, collection["id"], ["ad Zürich missi"])
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
     use_llm(FakeLLM(error=LLMUnavailable("The AI service is not available right now.")))
-    response = ask(client, collection["id"])
+    response = ask(client, page_id)
     assert response.status_code == 503
     assert response.json()["detail"]["code"] == "llm_unavailable"
 
 
 def test_missing_configuration_is_a_503_not_a_crash(client, repo, collection, monkeypatch):
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
     app.dependency_overrides.pop(get_llm, None)
     default_llm.cache_clear()
     monkeypatch.setattr(config, "GEMINI_API_KEY", "")
-    response = ask(client, collection["id"])
+    response = ask(client, page_id)
     assert response.status_code == 503
     default_llm.cache_clear()
 
 
-def test_unknown_collection_is_404_and_the_model_is_not_called(client):
+def test_unknown_page_is_404_and_the_model_is_not_called(client):
     fake = use_llm(FakeLLM())
     assert ask(client, str(uuid4())).status_code == 404
     assert fake.calls == []
 
 
 @pytest.mark.parametrize("question", ["", "   ", "x" * 501])
-def test_bad_questions_are_rejected(client, collection, question):
+def test_bad_questions_are_rejected(client, repo, collection, question):
+    _, page_id = add_page(repo, collection["id"], ["x"])
     use_llm(FakeLLM())
-    assert ask(client, collection["id"], question).status_code == 422
+    assert ask(client, page_id, question).status_code == 422
 
 
 def test_prompt_has_one_numbered_line_each_and_no_line_breaks_inside_lines():
-    prompt = build_prompt("Q?", [{"text": "first\nline  two"}, {"text": "second"}])
+    prompt = build_prompt("Q?", [{"text": "first\nline  two"}, {"text": "second"}], [])
     assert prompt.splitlines()[1:3] == ["[1] first line two", "[2] second"]
 
 
