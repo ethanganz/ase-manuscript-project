@@ -36,12 +36,6 @@ export function Header({
             Places
           </a>
           <a
-            className="hidden transition-colors hover:text-[#1e2a27] md:inline"
-            href="#ask"
-          >
-            Ask
-          </a>
-          <a
             className="transition-colors hover:text-[#1e2a27] aria-[current=page]:font-medium aria-[current=page]:text-[#1e3b35]"
             href={comparisonHref}
             aria-current={isComparisonOpen ? "page" : undefined}
