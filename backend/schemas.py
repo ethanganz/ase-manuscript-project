@@ -197,8 +197,17 @@ class MentionOut(BaseModel):
     document_name: str
 
 
+class ChatTurn(BaseModel):
+    """One earlier message of the chat. The browser keeps the chat and sends it back."""
+
+    role: Literal["user", "assistant"]
+    text: str = Field(max_length=4000)
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
+    # Earlier messages, oldest first. The server uses only the last few.
+    history: list[ChatTurn] = Field(default_factory=list, max_length=20)
 
     @field_validator("question")
     @classmethod
@@ -217,6 +226,7 @@ class AskSource(BaseModel):
     page_id: UUID
     document_id: UUID | None = None
     page_number: int | None = None
+    line_index: int | None = None  # position on the page, to highlight the line
     language: str | None = None
     text: str
 
