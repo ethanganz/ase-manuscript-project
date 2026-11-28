@@ -32,16 +32,17 @@ function readMessage(detail, status) {
 /**
  * Ask a question about one page.
  *   history: the last chat messages, oldest first: [{ role: "user" | "assistant", text }]
+ *   provider: "gemini" | "ollama" | null (null = the server's default)
  * Resolves with { answer, sources, grounded, document_answer, general_answer }.
  * Rejects with an AskError.
  */
-export async function askPage(pageId, question, history = []) {
+export async function askPage(pageId, question, history = [], provider = null) {
   let response;
   try {
     response = await apiFetch(`/api/pages/${encodeURIComponent(pageId)}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, history }),
+      body: JSON.stringify({ question, history, provider }),
     });
   } catch {
     throw new AskError(
@@ -68,4 +69,14 @@ export async function askPage(pageId, question, history = []) {
         : null,
     daily: Boolean(info.daily),
   });
+}
+
+/**
+ * Which models the chat can use right now.
+ * Resolves with { default, providers: [{ id, label, available, reason }] }.
+ */
+export async function getLlmProviders() {
+  const response = await apiFetch("/api/llm/providers");
+  if (!response.ok) throw new Error("Unable to load the AI models");
+  return response.json();
 }
