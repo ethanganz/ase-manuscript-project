@@ -238,15 +238,21 @@ class FakeLLM:
         return self.reply
 
 
-@lru_cache(maxsize=1)
-def default_llm() -> LLM:
-    """The one shared model client. Shared so the Gemini "wait" window is shared too."""
-    if config.LLM_PROVIDER == "ollama":
+@lru_cache(maxsize=4)
+def default_llm(provider: str = "") -> LLM:
+    """The shared client of one provider. It must be shared so Gemini's "wait" window is shared.
+
+    Prefer ``llm_for``, which always passes the provider by name.
+    """
+    provider = (provider or config.LLM_PROVIDER or "gemini").lower()
+    if provider == "ollama":
         return OllamaLLM(
             base_url=config.OLLAMA_URL,
             model=config.OLLAMA_MODEL,
             timeout_seconds=config.OLLAMA_TIMEOUT_SECONDS,
         )
+    if provider != "gemini":
+        raise LLMUnavailable("Unknown AI model.")
     if not config.GEMINI_API_KEY or not config.GEMINI_MODEL:
         logger.error("GEMINI_API_KEY or GEMINI_MODEL is not set")
         raise LLMUnavailable("The AI service is not configured.")
@@ -256,6 +262,42 @@ def default_llm() -> LLM:
         timeout_seconds=config.LLM_TIMEOUT_SECONDS,
         default_retry_seconds=config.LLM_DEFAULT_RETRY_SECONDS,
     )
+
+
+def llm_for(provider: str | None = None) -> LLM:
+    """The model for ``provider`` ("gemini" or "ollama"); None means the default one."""
+    return default_llm((provider or config.LLM_PROVIDER or "gemini").lower())
+
+
+def ollama_status() -> dict:
+    """Is the local model server running, and is the configured model downloaded?"""
+    try:
+        response = httpx.get(f"{config.OLLAMA_URL.rstrip('/')}/api/tags", timeout=2)
+        response.raise_for_status()
+        names = {str(m.get("name", "")) for m in response.json().get("models", [])}
+    except (httpx.HTTPError, ValueError):
+        return {"available": False, "reason": "The local model server is not running."}
+    wanted = config.OLLAMA_MODEL
+    if wanted in names or f"{wanted}:latest" in names:
+        return {"available": True, "reason": None}
+    return {"available": False, "reason": "The local model is still being downloaded."}
+
+
+def provider_list() -> dict:
+    """What the chat shows in its model selector."""
+    gemini_ok = bool(config.GEMINI_API_KEY and config.GEMINI_MODEL)
+    return {
+        "default": config.LLM_PROVIDER if config.LLM_PROVIDER in ("gemini", "ollama") else "gemini",
+        "providers": [
+            {
+                "id": "gemini",
+                "label": "Gemini",
+                "available": gemini_ok,
+                "reason": None if gemini_ok else "Gemini is not configured.",
+            },
+            {"id": "ollama", "label": "Llama (local)", **ollama_status()},
+        ],
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
