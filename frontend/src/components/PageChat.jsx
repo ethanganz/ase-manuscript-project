@@ -3,6 +3,8 @@ import {
   AlertTriangle,
   ArrowUp,
   Clock,
+  Cloud,
+  Cpu,
   Eraser,
   Languages,
   MapPin,
@@ -13,11 +15,21 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { askPage } from "../api/ask.js";
+import { askPage, getLlmProviders } from "../api/ask.js";
 import { formatWait, useCountdown } from "../library/useCountdown.js";
+import { useFetch } from "../library/useFetch.js";
 
 const MAX_QUESTION_LENGTH = 500; // the backend refuses longer questions
 const MAX_HISTORY = 4; // earlier messages sent with each new question
+const PROVIDER_KEY = "pageChatProvider"; // remembers the chosen model in this browser
+
+function readSavedProvider() {
+  try {
+    return localStorage.getItem(PROVIDER_KEY);
+  } catch {
+    return null; // storage can be blocked; the chat works without it
+  }
+}
 
 const SUGGESTIONS = [
   { icon: ScrollText, text: "Summarize this page" },
@@ -151,6 +163,11 @@ function AssistantMessage({ message, onJumpToLine }) {
             </p>
           </div>
         )}
+        {message.providerLabel && (
+          <p className="px-1 text-[11px] text-[#a0aba5]">
+            Answered by {message.providerLabel}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -276,7 +293,10 @@ export function PageChat({
   const [chats, setChats] = useState({}); // pageId -> messages
   const [input, setInput] = useState("");
   const [loadingPageId, setLoadingPageId] = useState("");
-  const [error, setError] = useState(null); // { message, daily }
+  const [rawError, setError] = useState(null); // { message, daily, provider }
+  const [limitedProvider, setLimitedProvider] = useState(null);
+  const [picked, setPicked] = useState(readSavedProvider);
+  const providersQuery = useFetch("llm-providers", getLlmProviders);
   const [confirm, setConfirm] = useState(null); // null | "clear" | "close"
   const { secondsLeft, totalSeconds, start } = useCountdown();
   const nextId = useRef(0);
@@ -285,9 +305,38 @@ export function PageChat({
 
   const messages = chats[pageId] ?? [];
   const loading = loadingPageId !== "";
-  const waiting = secondsLeft > 0;
+
+  // The model that answers: the user's choice if it can be used, else the server's default.
+  const providers = providersQuery.data?.providers ?? [];
+  const usable = (id) => providers.some((p) => p.id === id && p.available);
+  const activeProvider = !providersQuery.data
+    ? picked
+    : usable(picked)
+      ? picked
+      : usable(providersQuery.data.default)
+        ? providersQuery.data.default
+        : (providers.find((p) => p.available)?.id ?? null);
+  const providerLabel = (id) =>
+    providers.find((p) => p.id === id)?.label ?? "AI";
+  const alternative = providers.find(
+    (p) => p.id !== activeProvider && p.available,
+  );
+
+  // A wait only blocks the model that hit its limit.
+  const waiting = secondsLeft > 0 && limitedProvider === activeProvider;
+  const error =
+    rawError && rawError.provider === activeProvider ? rawError : null;
   const trimmed = input.trim();
   const canSend = ready && trimmed.length > 0 && !loading && !waiting;
+
+  function chooseProvider(id) {
+    setPicked(id);
+    try {
+      localStorage.setItem(PROVIDER_KEY, id);
+    } catch {
+      // not saved; the choice still works until the panel closes
+    }
+  }
 
   function scrollToEnd() {
     // after React has drawn the new message
@@ -321,6 +370,7 @@ export function PageChat({
     if (!ready || !question || loading || waiting) return;
 
     const forPage = pageId;
+    const provider = activeProvider;
     // The last MAX_HISTORY messages of this page's chat, before the new question.
     const history = messages.slice(-MAX_HISTORY).map((message) => ({
       role: message.role,
@@ -335,13 +385,14 @@ export function PageChat({
     scrollToEnd();
 
     try {
-      const data = await askPage(forPage, question, history);
+      const data = await askPage(forPage, question, history, provider);
       addMessage(forPage, {
         role: "assistant",
         answer: data.answer,
         documentAnswer: data.document_answer,
         generalAnswer: data.general_answer,
         sources: data.sources ?? [],
+        providerLabel: providerLabel(provider),
       });
     } catch (caught) {
       // Take the question back out of the chat and into the box, so nothing is lost.
@@ -352,8 +403,10 @@ export function PageChat({
       setInput(question);
       if (caught.status === 429 && caught.retryAfterSeconds && !caught.daily) {
         start(caught.retryAfterSeconds);
+        setLimitedProvider(provider);
       }
       setError({
+        provider,
         message: caught.message,
         limited: caught.status === 429,
         daily: caught.daily,
@@ -445,6 +498,44 @@ export function PageChat({
         </div>
       </header>
 
+      {/* Model selector */}
+      {providers.length > 0 && (
+        <div className="flex shrink-0 items-center gap-3 border-b border-[#e3eae4] bg-white/70 px-4 py-2">
+          <span className="text-[11px] font-semibold tracking-wider text-[#7e8b85] uppercase">
+            Model
+          </span>
+          <div
+            role="radiogroup"
+            aria-label="AI model"
+            className="flex flex-1 gap-1 rounded-xl bg-[#eaf0eb] p-1"
+          >
+            {providers.map((provider) => {
+              const active = provider.id === activeProvider;
+              const Icon = provider.id === "ollama" ? Cpu : Cloud;
+              return (
+                <button
+                  key={provider.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  disabled={!provider.available}
+                  title={provider.available ? "" : provider.reason}
+                  onClick={() => chooseProvider(provider.id)}
+                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all ${
+                    active
+                      ? "bg-white text-[#1e3b35] shadow-sm"
+                      : "text-[#6b7a72] hover:text-[#1e3b35]"
+                  } disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-[#6b7a72]`}
+                >
+                  <Icon className="size-3.5" />
+                  {provider.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
       <div
         ref={scroller}
@@ -511,6 +602,15 @@ export function PageChat({
                 </span>
               )}
             </div>
+            {error.limited && alternative && (
+              <button
+                type="button"
+                onClick={() => chooseProvider(alternative.id)}
+                className="mr-3.5 mb-2.5 ml-[2.4rem] text-xs font-medium underline underline-offset-2"
+              >
+                Use {alternative.label} instead
+              </button>
+            )}
             {error.limited && !error.daily && waiting && (
               <div className="h-1 bg-[#ead9ad]/60">
                 <div
