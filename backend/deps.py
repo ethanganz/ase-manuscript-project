@@ -5,7 +5,7 @@ import config
 from database.repository import Repository, SupabaseRepository
 from services.auth import decode_token
 from services.email import EmailSender, ResendEmailSender
-from services.llm import LLM, LLMUnavailable, default_llm
+from services.llm import LLM, LLMUnavailable, llm_for
 from services.storage import ObjectStorage, SupabaseStorage
 
 # Reads the login cookie. Also shows the lock icon in the API docs.
@@ -61,10 +61,18 @@ def require_visible_collection(repo: Repository, collection_id: str, user: dict 
     return collection
 
 
+def get_llm_chooser():
+    """FastAPI dependency: a function that returns the model for a provider name.
+
+    Tests override this with ``lambda: (lambda provider: fake)``.
+    """
+    return llm_for
+
+
 def get_llm() -> LLM:
     """FastAPI dependency. Tests override this with a fake model."""
     try:
-        return default_llm()
+        return llm_for(None)
     except LLMUnavailable as error:  # not configured
         raise HTTPException(
             status_code=503, detail={"code": "llm_unavailable", "message": str(error)}

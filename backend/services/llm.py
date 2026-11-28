@@ -1,4 +1,4 @@
-"""Ask a large language model (Gemini) a question, and report limits clearly.
+"""Ask a large language model (Gemini, or a local one through Ollama) a question, and report limits clearly.
 
 Everything else in the app talks to the small ``LLM`` interface, never to Gemini
 directly. That keeps the rest of the code simple and lets tests use ``FakeLLM``.
@@ -28,6 +28,7 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import Any, Protocol
 
+import httpx
 from google import genai
 from google.genai import errors, types
 
@@ -168,6 +169,62 @@ class GeminiLLM:
             raise LLMRateLimited(max(1, math.ceil(remaining)), daily)
 
 
+class OllamaLLM:
+    """``LLM`` backed by a local model served by Ollama (free, no usage limit).
+
+    There is no rate limit, so ``LLMRateLimited`` is never raised. Every problem
+    (Ollama not running, model not downloaded, timeout) becomes ``LLMUnavailable``.
+    """
+
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        timeout_seconds: int = 300,
+        client: httpx.Client | None = None,
+    ) -> None:
+        self._model = model
+        self._client = client or httpx.Client(
+            base_url=base_url.rstrip("/"), timeout=timeout_seconds
+        )
+
+    def generate(self, system: str, prompt: str) -> str:
+        try:
+            response = self._client.post(
+                "/api/chat",
+                json={
+                    "model": self._model,
+                    "stream": False,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "options": {"temperature": 0},
+                },
+            )
+            response.raise_for_status()
+            text = str((response.json().get("message") or {}).get("content", "")).strip()
+        except httpx.HTTPStatusError as error:
+            logger.error(
+                "Ollama request failed: %s %s",
+                error.response.status_code,
+                error.response.text[:300],
+            )
+            if error.response.status_code == 404:  # model not downloaded
+                raise LLMUnavailable(
+                    "The local AI model is not installed yet. Please try again later."
+                ) from error
+            raise LLMUnavailable("The AI service is not available right now.") from error
+        except (httpx.HTTPError, ValueError) as error:  # not running, timeout, bad answer
+            logger.error("Ollama request failed: %r", error)
+            raise LLMUnavailable("The AI service is not available right now.") from error
+
+        if not text:
+            logger.error("Ollama returned no text")
+            raise LLMUnavailable("The AI service gave no answer. Try rephrasing the question.")
+        return text
+
+
 class FakeLLM:
     """Stand-in for tests: returns ``reply`` or raises ``error`` and records the calls."""
 
@@ -183,9 +240,21 @@ class FakeLLM:
         return self.reply
 
 
-@lru_cache(maxsize=1)
-def default_llm() -> LLM:
-    """The one shared Gemini client. It must be shared so the "wait" window is shared too."""
+@lru_cache(maxsize=4)
+def default_llm(provider: str = "") -> LLM:
+    """The shared client of one provider. It must be shared so Gemini's "wait" window is shared.
+
+    Prefer ``llm_for``, which always passes the provider by name.
+    """
+    provider = (provider or config.LLM_PROVIDER or "gemini").lower()
+    if provider == "ollama":
+        return OllamaLLM(
+            base_url=config.OLLAMA_URL,
+            model=config.OLLAMA_MODEL,
+            timeout_seconds=config.OLLAMA_TIMEOUT_SECONDS,
+        )
+    if provider != "gemini":
+        raise LLMUnavailable("Unknown AI model.")
     if not config.GEMINI_API_KEY or not config.GEMINI_MODEL:
         logger.error("GEMINI_API_KEY or GEMINI_MODEL is not set")
         raise LLMUnavailable("The AI service is not configured.")
@@ -195,6 +264,42 @@ def default_llm() -> LLM:
         timeout_seconds=config.LLM_TIMEOUT_SECONDS,
         default_retry_seconds=config.LLM_DEFAULT_RETRY_SECONDS,
     )
+
+
+def llm_for(provider: str | None = None) -> LLM:
+    """The model for ``provider`` ("gemini" or "ollama"); None means the default one."""
+    return default_llm((provider or config.LLM_PROVIDER or "gemini").lower())
+
+
+def ollama_status() -> dict:
+    """Is the local model server running, and is the configured model downloaded?"""
+    try:
+        response = httpx.get(f"{config.OLLAMA_URL.rstrip('/')}/api/tags", timeout=2)
+        response.raise_for_status()
+        names = {str(m.get("name", "")) for m in response.json().get("models", [])}
+    except (httpx.HTTPError, ValueError):
+        return {"available": False, "reason": "The local model server is not running."}
+    wanted = config.OLLAMA_MODEL
+    if wanted in names or f"{wanted}:latest" in names:
+        return {"available": True, "reason": None}
+    return {"available": False, "reason": "The local model is still being downloaded."}
+
+
+def provider_list() -> dict:
+    """What the chat shows in its model selector."""
+    gemini_ok = bool(config.GEMINI_API_KEY and config.GEMINI_MODEL)
+    return {
+        "default": config.LLM_PROVIDER if config.LLM_PROVIDER in ("gemini", "ollama") else "gemini",
+        "providers": [
+            {
+                "id": "gemini",
+                "label": "Gemini",
+                "available": gemini_ok,
+                "reason": None if gemini_ok else "Gemini is not configured.",
+            },
+            {"id": "ollama", "label": "Llama (local)", **ollama_status()},
+        ],
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
