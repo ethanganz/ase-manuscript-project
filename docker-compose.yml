@@ -68,6 +68,8 @@ services:
     image: ollama/ollama:latest
     volumes:
       - ollama-models:/root/.ollama
+    ports:
+      - "11434:11434"
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s

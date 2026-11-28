@@ -265,7 +265,8 @@ def test_choosing_ollama_works_even_when_gemini_is_not_configured(
     default_llm.cache_clear()
     monkeypatch.setattr(config, "GEMINI_API_KEY", "")
     monkeypatch.setattr(
-        "services.llm.OllamaLLM.generate", lambda self, system, prompt: f"{DOC}\nok [1]\n{GEN}\nnone"
+        "services.llm.OllamaLLM.generate",
+        lambda self, system, prompt: f"{DOC}\nok [1]\n{GEN}\nnone",
     )
     assert ask(client, page_id, provider="ollama").status_code == 200
     assert ask(client, page_id, provider="gemini").status_code == 503
@@ -293,9 +294,7 @@ def test_provider_list_endpoint(client, monkeypatch):
 def test_provider_list_marks_ollama_available_only_when_the_model_is_downloaded(monkeypatch):
     monkeypatch.setattr(config, "OLLAMA_MODEL", "llama3.2:3b")
     monkeypatch.setattr(config, "GEMINI_API_KEY", "")
-    monkeypatch.setattr(
-        "services.llm.ollama_status", lambda: {"available": True, "reason": None}
-    )
+    monkeypatch.setattr("services.llm.ollama_status", lambda: {"available": True, "reason": None})
     result = provider_list()
     assert result["providers"][0]["available"] is False  # Gemini has no key
     assert result["providers"][1]["available"] is True

@@ -80,7 +80,9 @@ def build_prompt(question: str, lines: list[dict], history: list[dict]) -> str:
         f"[{number}] {' '.join(line['text'].split())[:MAX_LINE_CHARS]}"
         for number, line in enumerate(lines, start=1)
     )
-    parts = [f"Transcript lines of the page (software-read handwriting, may contain errors):\n{numbered}"]
+    parts = [
+        f"Transcript lines of the page (software-read handwriting, may contain errors):\n{numbered}"
+    ]
     if history:
         chat = "\n".join(
             f"{'User' if turn['role'] == 'user' else 'Assistant'}: "

@@ -206,7 +206,9 @@ class OllamaLLM:
             text = str((response.json().get("message") or {}).get("content", "")).strip()
         except httpx.HTTPStatusError as error:
             logger.error(
-                "Ollama request failed: %s %s", error.response.status_code, error.response.text[:300]
+                "Ollama request failed: %s %s",
+                error.response.status_code,
+                error.response.text[:300],
             )
             if error.response.status_code == 404:  # model not downloaded
                 raise LLMUnavailable(

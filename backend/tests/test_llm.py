@@ -212,6 +212,7 @@ def test_manual_check_reports_the_wait_time(monkeypatch, capsys):
 
 # --- Ollama (local model) -----------------------------------------------------------
 
+
 def ollama(handler):
     client = httpx.Client(base_url="http://ollama:11434", transport=httpx.MockTransport(handler))
     return OllamaLLM("http://ollama:11434", "llama3.2:3b", client=client)
