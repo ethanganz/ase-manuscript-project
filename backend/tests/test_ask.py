@@ -5,15 +5,42 @@ from uuid import uuid4
 import pytest
 
 import config
-from deps import get_llm
+from deps import get_llm_chooser
 from main import app
 from services.ask import MAX_HISTORY, SYSTEM_INSTRUCTION, build_prompt, cited_numbers
-from services.llm import FakeLLM, LLMRateLimited, LLMUnavailable, default_llm
+from services.llm import FakeLLM, LLMRateLimited, LLMUnavailable, default_llm, provider_list
 
 
 def use_llm(fake):
-    app.dependency_overrides[get_llm] = lambda: fake
+    """Every provider answers with ``fake``. ``fake.providers`` records which were asked for."""
+    fake.providers = []
+
+    def choose(provider):
+        fake.providers.append(provider)
+        return fake
+
+    app.dependency_overrides[get_llm_chooser] = lambda: choose
     return fake
+
+
+def add_lines(repo, collection_id, texts):
+    """Create one document with one page in the collection and link the lines to that page.
+
+    Not used here any more, but other test files import it.
+    """
+    document_id, page_id = str(uuid4()), str(uuid4())
+    repo.create_document({"id": document_id, "collection_id": collection_id})
+    repo.create_pages([{"id": page_id, "document_id": document_id, "page_number": 3}])
+    repo.upsert_text_lines(
+        [
+            {"source_line_id": f"{page_id}-{i}", "text": text, "language": "la"}
+            for i, text in enumerate(texts)
+        ]
+    )
+    for line in repo.text_lines.values():
+        if line["source_line_id"].startswith(page_id):
+            line["page_id"] = page_id
+    return document_id, page_id
 
 
 def add_page(repo, collection_id, texts, status="complete"):
@@ -35,10 +62,12 @@ def add_page(repo, collection_id, texts, status="complete"):
     return document_id, page_id
 
 
-def ask(client, page_id, question="Who writes about Zurich?", history=None):
+def ask(client, page_id, question="Who writes about Zurich?", history=None, provider=None):
     body = {"question": question}
     if history is not None:
         body["history"] = history
+    if provider is not None:
+        body["provider"] = provider
     return client.post(f"/api/pages/{page_id}/ask", json=body)
 
 
@@ -175,7 +204,7 @@ def test_model_failure_becomes_503_with_a_safe_message(client, repo, collection)
 
 def test_missing_configuration_is_a_503_not_a_crash(client, repo, collection, monkeypatch):
     _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
-    app.dependency_overrides.pop(get_llm, None)
+    app.dependency_overrides.pop(get_llm_chooser, None)
     default_llm.cache_clear()
     monkeypatch.setattr(config, "GEMINI_API_KEY", "")
     response = ask(client, page_id)
@@ -212,3 +241,61 @@ def test_prompt_has_one_numbered_line_each_and_no_line_breaks_inside_lines():
 )
 def test_cited_numbers(answer, expected):
     assert cited_numbers(answer, 3) == expected
+
+
+def test_the_chosen_model_is_used_and_no_choice_means_the_default(client, repo, collection):
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
+    fake = use_llm(FakeLLM(reply=f"{DOC}\nok [1]\n{GEN}\nnone"))
+    assert ask(client, page_id, provider="ollama").status_code == 200
+    assert ask(client, page_id).status_code == 200
+    assert fake.providers == ["ollama", None]
+
+
+def test_an_unknown_model_name_is_rejected(client, repo, collection):
+    _, page_id = add_page(repo, collection["id"], ["x"])
+    use_llm(FakeLLM())
+    assert ask(client, page_id, provider="gpt").status_code == 422
+
+
+def test_choosing_ollama_works_even_when_gemini_is_not_configured(
+    client, repo, collection, monkeypatch
+):
+    _, page_id = add_page(repo, collection["id"], ["ad Zürich missi"])
+    app.dependency_overrides.pop(get_llm_chooser, None)
+    default_llm.cache_clear()
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "")
+    monkeypatch.setattr(
+        "services.llm.OllamaLLM.generate", lambda self, system, prompt: f"{DOC}\nok [1]\n{GEN}\nnone"
+    )
+    assert ask(client, page_id, provider="ollama").status_code == 200
+    assert ask(client, page_id, provider="gemini").status_code == 503
+    default_llm.cache_clear()
+
+
+def test_provider_list_endpoint(client, monkeypatch):
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "key")
+    monkeypatch.setattr(config, "GEMINI_MODEL", "model")
+    monkeypatch.setattr(
+        "routes.ask.provider_list",
+        lambda: {
+            "default": "gemini",
+            "providers": [
+                {"id": "gemini", "label": "Gemini", "available": True, "reason": None},
+                {"id": "ollama", "label": "Llama (local)", "available": False, "reason": "off"},
+            ],
+        },
+    )
+    body = client.get("/api/llm/providers").json()
+    assert body["default"] == "gemini"
+    assert [p["id"] for p in body["providers"]] == ["gemini", "ollama"]
+
+
+def test_provider_list_marks_ollama_available_only_when_the_model_is_downloaded(monkeypatch):
+    monkeypatch.setattr(config, "OLLAMA_MODEL", "llama3.2:3b")
+    monkeypatch.setattr(config, "GEMINI_API_KEY", "")
+    monkeypatch.setattr(
+        "services.llm.ollama_status", lambda: {"available": True, "reason": None}
+    )
+    result = provider_list()
+    assert result["providers"][0]["available"] is False  # Gemini has no key
+    assert result["providers"][1]["available"] is True

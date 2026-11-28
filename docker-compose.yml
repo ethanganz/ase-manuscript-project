@@ -57,6 +57,45 @@ services:
     ports:
       - "8000:8000"
 
+  ollama:
+    # Free local language model for the page chat (instead of Gemini). Start with:
+    #   docker compose --profile ollama up --build
+    # and set in backend/.env:  LLM_PROVIDER=ollama   OLLAMA_URL=http://ollama:11434
+    # Not published to the host: only the backend talks to it. To move it to another
+    # machine, run this service there and point OLLAMA_URL at that machine.
+    # With an NVIDIA GPU (and the NVIDIA container toolkit) uncomment "deploy" below.
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  ollama-models:
+    # One-time model download into the volume "ollama-models" (llama3.2:3b is about
+    # 2 GB). Change the model with OLLAMA_MODEL in the .env next to this file, and use
+    # the same name in backend/.env. Later runs find the model and exit quickly.
+    profiles: ["ollama"]
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-llama3.2:3b}"]
+    restart: "no"
+
   frontend:
     # Tag comes from frontend/docker/IMAGE_VERSION via deploy.sh (defaults to :latest).
     image: ghcr.io/ethanganz/ase-manuscript-project-frontend:${FRONTEND_IMAGE_VERSION:-latest}
@@ -71,3 +110,4 @@ services:
 
 volumes:
   htr-models:
+  ollama-models:

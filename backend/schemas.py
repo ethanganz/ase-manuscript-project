@@ -208,6 +208,8 @@ class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     # Earlier messages, oldest first. The server uses only the last few.
     history: list[ChatTurn] = Field(default_factory=list, max_length=20)
+    # Which model answers. None = the server's default (LLM_PROVIDER).
+    provider: Literal["gemini", "ollama"] | None = None
 
     @field_validator("question")
     @classmethod
@@ -216,6 +218,18 @@ class AskRequest(BaseModel):
         if not value:
             raise ValueError("Question cannot be empty")
         return value
+
+
+class LLMProviderOut(BaseModel):
+    id: Literal["gemini", "ollama"]
+    label: str
+    available: bool
+    reason: str | None = None
+
+
+class LLMProvidersOut(BaseModel):
+    default: Literal["gemini", "ollama"]
+    providers: list[LLMProviderOut]
 
 
 class AskSource(BaseModel):

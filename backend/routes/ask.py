@@ -3,22 +3,28 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 
 from database.repository import Repository
-from deps import get_llm, get_optional_user, get_repo, require_visible_collection
-from schemas import AskRequest, AskResponse
+from deps import get_llm_chooser, get_optional_user, get_repo, require_visible_collection
+from schemas import AskRequest, AskResponse, LLMProvidersOut
 from services.ask import answer_page_question
-from services.llm import LLM, LLMRateLimited, LLMUnavailable
+from services.llm import LLMRateLimited, LLMUnavailable, provider_list
 
-router = APIRouter(prefix="/api/pages", tags=["ask"])
+router = APIRouter(prefix="/api", tags=["ask"])
+
+
+@router.get("/llm/providers", response_model=LLMProvidersOut)
+def list_providers():
+    """Which models the chat can use right now, and which one is the default."""
+    return provider_list()
 
 
 # Plain `def` (not async): the call to the language model blocks, so FastAPI runs
 # this in a worker thread and other requests are not held up.
-@router.post("/{page_id}/ask", response_model=AskResponse)
+@router.post("/pages/{page_id}/ask", response_model=AskResponse)
 def ask(
     page_id: UUID,
     payload: AskRequest,
     repo: Repository = Depends(get_repo),
-    llm: LLM = Depends(get_llm),
+    choose_llm=Depends(get_llm_chooser),
     user: dict | None = Depends(get_optional_user),
 ):
     """Answer a question about one page, using its transcript lines and the recent chat.
@@ -41,6 +47,7 @@ def ask(
 
     history = [turn.model_dump() for turn in payload.history]
     try:
+        llm = choose_llm(payload.provider)
         return answer_page_question(repo, llm, page, payload.question, history)
     except LLMRateLimited as error:
         message = (
